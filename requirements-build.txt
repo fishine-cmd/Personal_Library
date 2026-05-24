@@ -1,0 +1,3 @@
+# Build-time dependencies (only needed to produce the .exe).
+-r requirements.txt
+pyinstaller>=6.0
