@@ -24,6 +24,7 @@ output/
 build/
 dist/
 *.spec
+!library_system.spec
 build_log.txt
 
 # Third-party tool (upstream at D:\app\MinerU-master)
