@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env / secrets
+.env
+
+# Flask / app data
+instance/
+uploads/
+output/
+*.sqlite
+*.db
+
+# Tests / IDE
+.pytest_cache/
+.idea/
+.vscode/
+
+# Build artifacts (PyInstaller)
+build/
+dist/
+*.spec
+build_log.txt
+
+# Third-party tool (upstream at D:\app\MinerU-master)
+MinerU-master（PDF识别工具）/
