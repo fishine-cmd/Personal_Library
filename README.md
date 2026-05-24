@@ -1322,7 +1322,7 @@ pytest -q tests
 
 ---
 
-## 12. 最后重点说明：项目打包功能
+## 12. 重点说明：项目打包功能
 
 这一节请特别重视。  
 本项目最有价值的特点之一，就是它不仅是一个 Flask 网站，更是一个可打包成 Windows 桌面软件的项目。
@@ -1456,3 +1456,52 @@ dist\PersonalLibrary\
 
 ---
 
+## 13. 关于用户账密安全
+
+### 13.1 用户密码：用 Werkzeug 的哈希函数
+
+  app/models.py:28-32：
+  def set_password(self, raw: str) -> None:
+      self.password_hash = generate_password_hash(raw)
+
+  def check_password(self, raw: str) -> bool:
+      return check_password_hash(self.password_hash, raw)
+
+### 13.2 generate_password_hash 来自 werkzeug.security（models.py:3 import），它的实际工作：
+  
+1. 内部生成随机 salt（每个用户一个，存在结果字符串里）
+2. 用算法（Werkzeug 默认 scrypt，老版本是 pbkdf2:sha256:600000）把 raw + salt 算成不可逆的哈希
+3. 返回一个形如 scrypt:32768:8:1$<salt>$<hash> 的字符串
+4. 存进数据库 users.password_hash 列（models.py:17）
+
+### 13.3 校验时（登录），check_password_hash(self.password_hash, raw)：
+  - 从存储的字符串里解出算法、salt、目标哈希
+  - 用同样算法对用户输入的密码 + 同样 salt 算一次
+  - 比较两个哈希是否相等（用恒定时间比较，防侧信道）
+
+   因此即使 SECRET_KEY 被泄露，数据库里的密码哈希仍然安全。
+
+### 13.4 SECRET_KEY 实际干什么用
+
+  config.py:10：
+  SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-only-change-me")
+
+它被 Flask 本身和 Flask-Login 用来：
+
+1. 签名 session cookie：Flask 把登录状态等放进客户端 cookie 时，用 SECRET_KEY 做 HMAC 签名，防止用户篡改 cookie
+把自己变成别人
+2. 签名 "remember me" 持久化 cookie：auth.py:54 的 login_user(user, remember=...) 用它
+3. CSRF 令牌（如果启用了 Flask-WTF）
+4. flash 消息（也走 session）
+
+### 13.5 为什么这样分开是好的
+
+  ┌──────────────────────┬───────────────────────────────────────────────────────────────────────────────────┐
+  │      如果只泄露      │                                       后果                                        │
+  ├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────┤
+  │ SECRET_KEY           │ 攻击者能伪造 session cookie，冒充任意用户登录；但拿不到密码原文                   │
+  ├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────┤
+  │ password_hash 整张表 │ 攻击者只能离线暴力破解弱密码，强密码仍安全；不能伪造 session（因为没 SECRET_KEY） │
+  ├──────────────────────┼───────────────────────────────────────────────────────────────────────────────────┤
+  │ 两个都泄露           │ 才能完全攻陷                                                                      │
+  └──────────────────────┴───────────────────────────────────────────────────────────────────────────────────┘
