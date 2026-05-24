@@ -1,0 +1,13 @@
+Flask>=3.0,<4.0
+Flask-Login>=0.6
+Flask-WTF>=1.2
+SQLAlchemy>=2.0
+PyMySQL>=1.1
+cryptography>=42.0
+python-dotenv>=1.0
+WTForms>=3.1
+email-validator>=2.1
+bibtexparser>=1.4
+requests>=2.32
+pywebview>=5.0
+pytest>=8.0
