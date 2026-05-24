@@ -1385,7 +1385,7 @@ pyinstaller library_system.spec --clean --noconfirm
 #### 方式 2：使用脚本（先进行数字签名）
 
 ```powershell
-PowerShell -ExecutionPolicy Bypass -File .\build.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\build.ps1
 ```
 
