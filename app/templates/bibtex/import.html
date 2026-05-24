@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}导入 BibTeX{% endblock %}
+{% block content %}
+<h4 class="mb-3">导入 BibTeX</h4>
+
+<form method="post" enctype="multipart/form-data">
+  <div class="mb-3">
+    <label class="form-label">上传 .bib 文件</label>
+    <input type="file" class="form-control" name="bib_file" accept=".bib,.txt">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">或粘贴 BibTeX 内容</label>
+    <textarea class="form-control font-monospace" name="bib_text" rows="14"
+              placeholder="@article{key, title={...}, author={...}, year={2023}, journal={...}}"></textarea>
+  </div>
+  <button class="btn btn-primary" type="submit">导入</button>
+  <a class="btn btn-outline-secondary" href="{{ url_for('bibtex.export_all') }}">导出全部为 .bib</a>
+  <a class="btn btn-link" href="{{ url_for('documents.list_documents') }}">返回</a>
+</form>
+{% endblock %}

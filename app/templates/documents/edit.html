@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}{% if doc %}编辑{% else %}新增{% endif %}文献{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{% if doc %}编辑文献{% else %}新增文献{% endif %}</h4>
+  <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recognizeModal">
+    <i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown
+  </button>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="row g-3">
+  <div class="col-12">
+    <label class="form-label">标题 *</label>
+    <input class="form-control" name="title" required value="{{ doc.title if doc else '' }}">
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">文献类型</label>
+    <select name="document_type" class="form-select">
+      {% set t = doc.document_type if doc else 'journal_article' %}
+      <option value="journal_article" {% if t=='journal_article' %}selected{% endif %}>期刊论文</option>
+      <option value="conference_paper" {% if t=='conference_paper' %}selected{% endif %}>会议论文</option>
+      <option value="book" {% if t=='book' %}selected{% endif %}>书籍</option>
+      <option value="thesis" {% if t=='thesis' %}selected{% endif %}>学位论文</option>
+      <option value="report" {% if t=='report' %}selected{% endif %}>报告</option>
+      <option value="other" {% if t=='other' %}selected{% endif %}>其他</option>
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label">分类</label>
+    <select name="category_id" class="form-select">
+      <option value="">（未分类）</option>
+      {% for c in categories %}
+      <option value="{{ c.id }}" {% if doc and doc.category_id==c.id %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">出版年份</label>
+    <input class="form-control" type="number" name="publication_year"
+           value="{{ doc.publication_year if doc and doc.publication_year else '' }}">
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">阅读状态</label>
+    <select name="reading_status" class="form-select">
+      {% set s = doc.reading_status if doc else 'unread' %}
+      <option value="unread" {% if s=='unread' %}selected{% endif %}>未读</option>
+      <option value="reading" {% if s=='reading' %}selected{% endif %}>在读</option>
+      <option value="read" {% if s=='read' %}selected{% endif %}>已读</option>
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label class="form-label">评分</label>
+    <select name="rating" class="form-select">
+      {% set r = doc.rating if doc and doc.rating else 0 %}
+      <option value="" {% if r==0 %}selected{% endif %}>—</option>
+      {% for i in range(1,6) %}<option value="{{ i }}" {% if r==i %}selected{% endif %}>{{ i }}</option>{% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-6">
+    <label class="form-label">来源（期刊/会议名称）</label>
+    <input class="form-control" name="source_name" list="dl-sources"
+           value="{{ doc.source.name if doc and doc.source else '' }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">来源类型</label>
+    <select name="source_type" class="form-select">
+      {% set st = doc.source.type if doc and doc.source else 'journal' %}
+      <option value="journal" {% if st=='journal' %}selected{% endif %}>期刊</option>
+      <option value="conference" {% if st=='conference' %}selected{% endif %}>会议</option>
+      <option value="book_series" {% if st=='book_series' %}selected{% endif %}>丛书</option>
+      <option value="other" {% if st=='other' %}selected{% endif %}>其他</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">出版社</label>
+    <input class="form-control" name="publisher_name" list="dl-publishers"
+           value="{{ doc.source.publisher.name if doc and doc.source and doc.source.publisher else '' }}">
+  </div>
+
+  <div class="col-md-3"><label class="form-label">卷</label>
+    <input class="form-control" name="volume" value="{{ doc.volume if doc else '' }}"></div>
+  <div class="col-md-3"><label class="form-label">期</label>
+    <input class="form-control" name="issue" value="{{ doc.issue if doc else '' }}"></div>
+  <div class="col-md-3"><label class="form-label">页码</label>
+    <input class="form-control" name="pages" value="{{ doc.pages if doc else '' }}"></div>
+  <div class="col-md-3"><label class="form-label">DOI</label>
+    <input class="form-control" name="doi" value="{{ doc.doi if doc else '' }}"></div>
+
+  <div class="col-12">
+    <label class="form-label">作者（每行一个，格式：<code>姓名[#编号] | 单位1; 单位2</code>，单位可选）</label>
+    <textarea class="form-control font-monospace" id="authors-raw" name="authors_raw" rows="4"
+              placeholder="张三 | 复旦大学; 微软研究院&#10;李四#2 | 北京大学">{{ authors_text }}</textarea>
+    <div id="author-conflicts" class="mt-2"></div>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label">关键词（逗号或分号分隔）</label>
+    <input class="form-control" name="keywords_raw" value="{{ doc.keywords_display if doc else '' }}">
+  </div>
+
+  <div class="col-12">
+    <label class="form-label">摘要</label>
+    <textarea class="form-control" name="abstract" rows="4">{{ doc.abstract if doc else '' }}</textarea>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label">个人笔记</label>
+    <textarea class="form-control" name="notes" rows="3">{{ doc.notes if doc else '' }}</textarea>
+  </div>
+
+  <div class="col-12">
+    <label class="form-label">附件（PDF / DOCX 等，可多选）</label>
+    <input class="form-control" type="file" name="attachments" multiple>
+    {% if doc and doc.files %}
+      <div class="form-text">已有附件：{{ doc.files|length }} 个（在详情页删除）</div>
+    {% endif %}
+  </div>
+
+  <div class="col-12">
+    <button class="btn btn-primary" type="submit">保存</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('documents.list_documents') }}">取消</a>
+  </div>
+</form>
+
+<datalist id="dl-sources"></datalist>
+<datalist id="dl-publishers"></datalist>
+
+<!-- Recognize PDF Modal -->
+<div class="modal fade" id="recognizeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3" id="recognize-upload-area">
+          <label class="form-label">PDF 文件</label>
+          <input type="file" id="recognize-file" class="form-control" accept="application/pdf">
+        </div>
+
+        <div id="recognize-status" class="mb-3"></div>
+
+        <div id="recognize-result" class="d-none">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>识别结果（Markdown）</strong>
+            <span class="small text-muted" id="recognize-filename"></span>
+          </div>
+          <pre id="markdown-preview" class="small bg-body-tertiary text-body p-2 rounded border"
+               style="max-height:420px;overflow:auto;white-space:pre-wrap"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        <button type="button" class="btn btn-outline-primary d-none" id="btn-copy-md">复制 Markdown</button>
+        <button type="button" class="btn btn-outline-success d-none" id="btn-download-md">下载 .md 文件</button>
+        <button type="button" class="btn btn-primary" id="btn-recognize">开始识别</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // populate autocompletion datalists from /library/api
+  fetch('{{ url_for("library.api_sources") }}').then(r=>r.json()).then(items=>{
+    const dl=document.getElementById('dl-sources');
+    items.forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
+  });
+  fetch('{{ url_for("library.api_publishers") }}').then(r=>r.json()).then(items=>{
+    const dl=document.getElementById('dl-publishers');
+    items.forEach(n=>{const o=document.createElement('option');o.value=n;dl.appendChild(o);});
+  });
+
+  // Author same-name disambiguation panel.
+  (function setupAuthorConflicts() {
+    const ta = document.getElementById('authors-raw');
+    const panel = document.getElementById('author-conflicts');
+    if (!ta || !panel) return;
+
+    const NAME_CODE_RE = /^(.+?)(?:#(\d+|new))?\s*$/;
+    const cache = new Map();
+    let timer = null;
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function parseLines() {
+      return ta.value.split('\n').map((raw, idx) => {
+        const trimmed = raw.trim();
+        if (!trimmed) return null;
+        const parts = trimmed.split('|').map(p => p.trim());
+        const m = parts[0].match(NAME_CODE_RE);
+        if (!m) return null;
+        return { idx, name: m[1].trim(), code: m[2] || null };
+      }).filter(Boolean);
+    }
+
+    function setLineCode(lineIdx, codeStr) {
+      const lines = ta.value.split('\n');
+      if (lineIdx >= lines.length) return;
+      const raw = lines[lineIdx];
+      const leadingWs = raw.match(/^\s*/)[0] || '';
+      const parts = raw.split('|');
+      const m = parts[0].trim().match(NAME_CODE_RE);
+      if (!m) return;
+      const base = m[1].trim();
+      parts[0] = `${leadingWs}${base}#${codeStr}` + (parts.length > 1 ? ' ' : '');
+      lines[lineIdx] = parts.join('|').replace(/\s+$/, '');
+      ta.value = lines.join('\n');
+      schedule();
+    }
+
+    async function lookup(name) {
+      if (cache.has(name)) return cache.get(name);
+      try {
+        const r = await fetch(`{{ url_for("documents.author_lookup") }}?name=${encodeURIComponent(name)}`);
+        const j = await r.json();
+        cache.set(name, j);
+        return j;
+      } catch (e) {
+        return { name, authors: [], next_code: 1 };
+      }
+    }
+
+    async function refresh() {
+      const items = parseLines();
+      const unresolvedByName = new Map();
+      items.forEach(it => {
+        if (it.code != null) return;
+        if (!unresolvedByName.has(it.name)) unresolvedByName.set(it.name, it.idx);
+      });
+      if (!unresolvedByName.size) {
+        panel.innerHTML = '';
+        return;
+      }
+
+      const cards = [];
+      for (const [name, lineIdx] of unresolvedByName) {
+        const r = await lookup(name);
+        if (!r.authors || r.authors.length === 0) continue;
+        const existing = r.authors.map(a => {
+          const affs = a.affiliations.length ? a.affiliations.join('; ') : '（无单位）';
+          const sample = a.sample_doc
+            ? `代表作《${escapeHtml(a.sample_doc.title)}${a.sample_doc.year ? ' · ' + a.sample_doc.year : ''}》`
+            : '（你的库中暂无此人的文献）';
+          return `
+            <div class="d-flex justify-content-between align-items-start gap-2 py-1">
+              <div class="small">
+                <strong>#${a.code}</strong> · ${escapeHtml(affs)}<br>
+                <span class="text-muted">${sample}</span>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" data-line="${lineIdx}" data-code="${a.code}">选 #${a.code}</button>
+            </div>`;
+        }).join('');
+        cards.push(`
+          <div class="card border-warning mb-2">
+            <div class="card-header py-2 small">
+              <strong>『${escapeHtml(name)}』</strong> 在库中已有 ${r.authors.length} 条记录，请确认这次录入是谁
+            </div>
+            <div class="card-body py-2">
+              ${existing}
+              <hr class="my-2">
+              <button type="button" class="btn btn-sm btn-outline-success" data-line="${lineIdx}" data-code="new">是新人 · 分配 #${r.next_code}</button>
+            </div>
+          </div>`);
+      }
+      panel.innerHTML = cards.join('');
+      panel.querySelectorAll('button[data-line]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          setLineCode(parseInt(btn.dataset.line, 10), btn.dataset.code);
+        });
+      });
+    }
+
+    function schedule() {
+      clearTimeout(timer);
+      timer = setTimeout(refresh, 400);
+    }
+
+    ta.addEventListener('input', schedule);
+    ta.addEventListener('blur', schedule);
+    schedule();
+  })();
+
+  // PDF recognition - shows Markdown, supports download / copy.
+  (function() {
+    const btnRecognize = document.getElementById('btn-recognize');
+    const btnDownload = document.getElementById('btn-download-md');
+    const btnCopy = document.getElementById('btn-copy-md');
+    const fileEl = document.getElementById('recognize-file');
+    const statusEl = document.getElementById('recognize-status');
+    const resultEl = document.getElementById('recognize-result');
+    const filenameEl = document.getElementById('recognize-filename');
+    const mdPre = document.getElementById('markdown-preview');
+
+    let lastMarkdown = '';
+    let lastDownloadName = 'mineru-result.md';
+
+    function downloadFile(name, text) {
+      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    btnDownload.addEventListener('click', () => {
+      if (lastMarkdown) downloadFile(lastDownloadName, lastMarkdown);
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      if (!lastMarkdown) return;
+      try {
+        await navigator.clipboard.writeText(lastMarkdown);
+        btnCopy.textContent = '已复制';
+        setTimeout(() => btnCopy.textContent = '复制 Markdown', 1800);
+      } catch (e) {
+        statusEl.innerHTML = `<div class="alert alert-warning py-2">复制失败：${e}</div>`;
+      }
+    });
+
+    document.getElementById('recognizeModal').addEventListener('show.bs.modal', () => {
+      statusEl.innerHTML = '';
+      resultEl.classList.add('d-none');
+      btnDownload.classList.add('d-none');
+      btnCopy.classList.add('d-none');
+      btnRecognize.classList.remove('d-none');
+      btnRecognize.disabled = false;
+      btnRecognize.textContent = '开始识别';
+      lastMarkdown = '';
+    });
+
+    btnRecognize.addEventListener('click', async () => {
+      if (!fileEl.files.length) {
+        statusEl.innerHTML = '<div class="alert alert-warning py-2">请先选择一个 PDF</div>';
+        return;
+      }
+      const file = fileEl.files[0];
+      const fd = new FormData();
+      fd.append('pdf', file);
+
+      btnRecognize.disabled = true;
+      btnRecognize.textContent = '识别中...';
+      statusEl.innerHTML = `
+        <div class="alert alert-info py-2">
+          <div class="d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+            <div>正在解析 PDF（耗时数十秒到数分钟，请勿关闭窗口）…</div>
+          </div>
+        </div>`;
+
+      try {
+        const r = await fetch('{{ url_for("documents.recognize_pdf") }}', { method: 'POST', body: fd });
+        const text = await r.text();
+        let j;
+        try {
+          j = JSON.parse(text);
+        } catch (parseErr) {
+          let hint = '';
+          if (r.status === 404) hint = '该接口未注册 —— 你跑的可能是旧 exe，或没装新依赖。';
+          else if (r.status === 401 || r.status === 302) hint = '登录会话可能已失效，请刷新页面重新登录。';
+          else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 50MB）。';
+          else if (r.status >= 500) hint = '服务器内部错误，请查看 Flask 终端输出的 Python 报错。';
+          else hint = `HTTP ${r.status}。`;
+          statusEl.innerHTML = `<div class="alert alert-danger py-2"><strong>响应不是 JSON</strong><br>${hint}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${text.substring(0, 500).replace(/</g, '&lt;')}</pre></details></div>`;
+          btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+          return;
+        }
+        if (!j.ok) {
+          statusEl.innerHTML = `<div class="alert alert-danger py-2">识别失败：${j.error}</div>`;
+          btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+          return;
+        }
+
+        const md = j.markdown || '';
+        lastMarkdown = md;
+        const base = (file.name || 'mineru').replace(/\.pdf$/i, '');
+        lastDownloadName = `${base}.md`;
+
+        filenameEl.textContent = `${file.name} · ${md.length.toLocaleString()} 字符`;
+        mdPre.textContent = md;
+        resultEl.classList.remove('d-none');
+        btnDownload.classList.remove('d-none');
+        btnCopy.classList.remove('d-none');
+        btnRecognize.classList.add('d-none');
+
+        statusEl.innerHTML = `<div class="alert alert-success py-2">识别完成</div>`;
+      } catch (e) {
+        statusEl.innerHTML = `<div class="alert alert-danger py-2">请求失败：${e}</div>`;
+        btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+      }
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}分类管理{% endblock %}
+
+{% macro render_node(node) %}
+  <li class="list-group-item">
+    <div class="d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-folder"></i> {{ node.node.name }}</span>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" data-bs-toggle="collapse"
+                data-bs-target="#rename-{{ node.node.id }}">重命名</button>
+        <form method="post" action="{{ url_for('categories.delete', cat_id=node.node.id) }}"
+              onsubmit="return confirm('删除分类？其下文献会变为未分类。');">
+          <button class="btn btn-outline-danger" type="submit">删除</button>
+        </form>
+      </div>
+    </div>
+    <div class="collapse mt-2" id="rename-{{ node.node.id }}">
+      <form class="row g-2" method="post" action="{{ url_for('categories.rename', cat_id=node.node.id) }}">
+        <div class="col"><input class="form-control" name="name" value="{{ node.node.name }}" required></div>
+        <div class="col-auto"><button class="btn btn-primary" type="submit">保存</button></div>
+      </form>
+    </div>
+    {% if node.children %}
+    <ul class="list-group mt-2 ms-4">
+      {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+    </ul>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+{% block content %}
+<h4 class="mb-3">分类管理</h4>
+
+<div class="row g-3">
+  <div class="col-md-7">
+    {% if roots %}
+    <ul class="list-group">
+      {% for r in roots %}{{ render_node(r) }}{% endfor %}
+    </ul>
+    {% else %}
+    <div class="alert alert-light">还没有分类，在右侧新建一个。</div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header">新建分类</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('categories.create') }}">
+          <div class="mb-3">
+            <label class="form-label">名称</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">父分类（可选）</label>
+            <select class="form-select" name="parent_id">
+              <option value="">（顶级）</option>
+              {% for c in all_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit">创建</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

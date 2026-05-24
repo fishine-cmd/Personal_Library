@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}字典表维护{% endblock %}
+
+{% macro list_card(title, items, delete_endpoint, render_extra=none) %}
+<div class="col-md-6">
+  <div class="card mb-3">
+    <div class="card-header">{{ title }} <span class="badge bg-secondary">{{ items|length }}</span></div>
+    <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+      {% for item in items %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong>{{ item.name }}</strong>
+          {% if render_extra %}<div class="small text-muted">{{ render_extra(item) }}</div>{% endif %}
+        </div>
+        <form method="post" action="{{ url_for(delete_endpoint, **{delete_endpoint.split('.')[-1].split('_')[1] + '_id': item.id}) }}">
+          <button class="btn btn-sm btn-outline-danger" type="submit"
+                  onclick="return confirm('删除？');">×</button>
+        </form>
+      </li>
+      {% else %}
+      <li class="list-group-item text-muted">空</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">字典表维护</h4>
+  <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#cleanupModal">
+    <i class="bi bi-broom"></i> 检测冗余数据
+  </button>
+</div>
+
+<!-- Cleanup Modal -->
+<div class="modal fade" id="cleanupModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-broom"></i> 字典清理 · 冗余检测</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="cleanup-body">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary"></div>
+          <p class="mt-2 text-muted">扫描中…</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        <button type="button" class="btn btn-warning d-none" id="btn-cleanup-apply">清理全部孤立项</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLEANUP_SECTIONS = [
+  ['作者', 'authors'],
+  ['作者单位', 'affiliations'],
+  ['出版社', 'publishers'],
+  ['期刊 / 会议', 'sources'],
+  ['关键词', 'keywords'],
+];
+
+function plEscape(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function plCountBadge(n) {
+  if (n === 0) return '<span class="badge bg-secondary ms-auto">0</span>';
+  return `<span class="badge bg-warning ms-auto">${n}</span>`;
+}
+
+function plRenderOrphanSection(label, items) {
+  if (!items || items.length === 0) {
+    return `<details class="mb-0"><summary><span>${label}</span>${plCountBadge(0)}</summary></details>`;
+  }
+  const shown = items.slice(0, 100).map(n => `<li>${plEscape(n)}</li>`).join('');
+  const more = items.length > 100 ? `<li class="text-muted">（还有 ${items.length - 100} 条未列出）</li>` : '';
+  return `
+    <details class="mb-0">
+      <summary><span>${label}</span>${plCountBadge(items.length)}</summary>
+      <ul class="small mb-0" style="max-height:220px;overflow:auto;padding-left:1.4rem">${shown}${more}</ul>
+    </details>`;
+}
+
+function plRenderDupGroup(group) {
+  return `<div class="border rounded p-2 mb-2 bg-body-tertiary text-body small">
+    ${group.map(n => `<div>${plEscape(n)}</div>`).join('')}
+  </div>`;
+}
+
+function plRenderDupSection(label, groups) {
+  if (!groups || groups.length === 0) return '';
+  return `
+    <details class="mb-0">
+      <summary><span>${label}</span><span class="badge bg-secondary ms-auto">${groups.length} 组</span></summary>
+      <div>${groups.map(plRenderDupGroup).join('')}</div>
+    </details>`;
+}
+
+document.getElementById('cleanupModal').addEventListener('show.bs.modal', async () => {
+  const body = document.getElementById('cleanup-body');
+  const applyBtn = document.getElementById('btn-cleanup-apply');
+  body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3 mb-0 text-muted small">扫描中…</p></div>';
+  applyBtn.classList.add('d-none');
+  applyBtn.disabled = false;
+  applyBtn.innerHTML = '清理全部孤立项';
+
+  let j;
+  try {
+    const r = await fetch('{{ url_for("library.cleanup_scan") }}');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    j = await r.json();
+  } catch (e) {
+    body.innerHTML = `<div class="alert alert-danger mb-0">扫描失败：${plEscape(e.message || String(e))}</div>`;
+    return;
+  }
+
+  const orphans = j.orphans || {};
+  const duplicates = j.duplicates || {};
+  const totalOrphans = Object.values(orphans).reduce((acc, arr) => acc + (arr ? arr.length : 0), 0);
+  const totalDupGroups = Object.values(duplicates).reduce((acc, arr) => acc + (arr ? arr.length : 0), 0);
+
+  const orphanHTML = CLEANUP_SECTIONS.map(([label, key]) =>
+    plRenderOrphanSection(label, orphans[key])
+  ).join('');
+
+  const dupSections = CLEANUP_SECTIONS
+    .map(([label, key]) => plRenderDupSection(label, duplicates[key]))
+    .filter(Boolean)
+    .join('');
+
+  let html = `
+    <div class="mb-2 d-flex align-items-center justify-content-between">
+      <strong class="small">未被引用的孤立项</strong>
+      <span class="small text-muted">${totalOrphans} 条</span>
+    </div>
+    ${orphanHTML}`;
+
+  if (totalOrphans > 0) {
+    applyBtn.classList.remove('d-none');
+  } else {
+    html += '<div class="alert alert-success mt-3 mb-0 py-2 small">字典表干净，没有孤立记录</div>';
+  }
+
+  if (totalDupGroups > 0) {
+    html += `
+      <hr>
+      <div class="mb-2 d-flex align-items-center justify-content-between">
+        <strong class="small">疑似重复（仅展示）</strong>
+        <span class="small text-muted">${totalDupGroups} 组</span>
+      </div>
+      <p class="small text-muted mb-2">建议先把文献里的引用统一到主名字，再回到上面清理孤立项。</p>
+      ${dupSections}`;
+  }
+
+  body.innerHTML = html;
+});
+
+document.getElementById('btn-cleanup-apply').addEventListener('click', async () => {
+  if (!confirm('确认删除全部未被引用的字典记录？此操作不可撤销。')) return;
+  const btn = document.getElementById('btn-cleanup-apply');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>清理中…';
+
+  try {
+    const r = await fetch('{{ url_for("library.cleanup_apply") }}', { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      const d = j.deleted || {};
+      const summary = [
+        `作者 ${d.authors || 0}`,
+        `单位 ${d.affiliations || 0}`,
+        `出版社 ${d.publishers || 0}`,
+        `来源 ${d.sources || 0}`,
+        `关键词 ${d.keywords || 0}`
+      ].join('  ·  ');
+      alert(`清理完成。已删除：\n${summary}`);
+      location.reload();
+    } else {
+      alert('清理失败：' + (j.error || '未知错误'));
+      btn.disabled = false;
+      btn.innerHTML = '清理全部孤立项';
+    }
+  } catch (e) {
+    alert('请求失败：' + e);
+    btn.disabled = false;
+    btn.innerHTML = '清理全部孤立项';
+  }
+});
+</script>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">作者 <span class="badge bg-secondary">{{ authors|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for a in authors %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ a.name }}</strong> <small class="text-muted">#{{ a.code }}</small>
+            {% if a.affiliations %}<div class="small text-muted">{% for af in a.affiliations %}{{ af.name }}{% if not loop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+            <div class="small text-muted">{{ a.document_links|length }} 篇文献</div>
+          </div>
+          <form method="post" action="{{ url_for('library.delete_author', author_id=a.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">空</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">作者单位 <span class="badge bg-secondary">{{ affiliations|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for a in affiliations %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>{{ a.name }}<div class="small text-muted">{{ a.authors|length }} 位作者</div></div>
+          <form method="post" action="{{ url_for('library.delete_affiliation', aff_id=a.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}<li class="list-group-item text-muted">空</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">期刊 / 会议 <span class="badge bg-secondary">{{ sources|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for s in sources %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ s.name }}</strong> <span class="badge bg-light text-dark border">{{ s.type }}</span>
+            {% if s.publisher %}<div class="small text-muted">{{ s.publisher.name }}</div>{% endif %}
+            <div class="small text-muted">{{ s.documents|length }} 篇文献</div>
+          </div>
+          <form method="post" action="{{ url_for('library.delete_source', src_id=s.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}<li class="list-group-item text-muted">空</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">出版社 <span class="badge bg-secondary">{{ publishers|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for p in publishers %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>{{ p.name }}<div class="small text-muted">{{ p.sources|length }} 个来源</div></div>
+          <form method="post" action="{{ url_for('library.delete_publisher', pub_id=p.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}<li class="list-group-item text-muted">空</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
