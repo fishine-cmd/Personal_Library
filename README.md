@@ -331,7 +331,7 @@ library_system/
 
 它被谁使用：
 
-1. [config.py](C:/Users/lya/Desktop/library_system/config.py) 通过 `load_dotenv()` 读取它
+1. [config.py](~/Personal_Library/config.py) 通过 `load_dotenv()` 读取它
 2. 整个 Flask 应用通过配置系统间接使用它
 
 开发注意：
@@ -363,7 +363,7 @@ library_system/
 
 它连接谁：
 
-1. 被 [app/__init__.py](C:/Users/lya/Desktop/library_system/app/__init__.py) 读取
+1. 被 [app/__init__.py](~/Personal_Library/app/__init__.py) 读取
 2. 影响数据库、上传目录、测试模式等全局行为
 
 #### `run.py`
@@ -489,15 +489,15 @@ library_system/
 5. 注册所有蓝图
 6. 定义首页跳转逻辑
 
-你可以把它理解成：
+可以理解成：
 
 **“把零散部件组装成完整应用的总装配文件”**
 
 它连接谁：
 
-1. 读取 [config.py](C:/Users/lya/Desktop/library_system/config.py)
-2. 使用 [app/extensions.py](C:/Users/lya/Desktop/library_system/app/extensions.py)
-3. 导入 [app/models.py](C:/Users/lya/Desktop/library_system/app/models.py)
+1. 读取 [config.py](~/Personal_Library/config.py)
+2. 使用 [app/extensions.py](~/Personal_Library/app/extensions.py)
+3. 导入 [app/models.py](~/Personal_Library/app/models.py)
 4. 注册 `blueprints/` 里的所有页面模块
 
 #### `app/extensions.py`
