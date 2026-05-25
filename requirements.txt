@@ -11,3 +11,4 @@ bibtexparser>=1.4
 requests>=2.32
 pywebview>=5.0
 pytest>=8.0
+Flask-SQLAlchemy>=3.1
