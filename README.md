@@ -182,70 +182,7 @@ MinerU 是一个独立的文档解析工具。
 
 ### 4.3 从源码第一次运行
 
-#### 步骤 1：进入项目目录
-
-```powershell
-cd C:\Users\lya\Desktop\library_system
-```
-
-#### 步骤 2：创建虚拟环境
-
-```powershell
-python -m venv .venv
-```
-
-#### 步骤 3：激活虚拟环境
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-#### 步骤 4：安装依赖
-
-```powershell
-pip install -r requirements.txt
-```
-
-#### 步骤 5：检查 `.env`
-
-将'.env.example'中的FLASK_SECRET_KEY和DATABASE_URL修改后存为.env文件
-确认 `.env` 中的数据库地址正确，例如：
-
-1. 用户名是否正确
-2. 密码是否正确
-3. 数据库名是否正确
-
-#### 步骤 6：运行开发服务器
-
-```powershell
-python run.py
-```
-
-#### 步骤 7：在浏览器打开
-
-```
-http://127.0.0.1:5000
-```
-
-#### 第一次运行时会发生什么
-
-`create_app()` 在启动时会执行一次 `db.create_all()`。
-
-这表示：
-
-1. 如果数据库表还不存在，会自动创建。
-2. 如果表已经存在，再运行也不会重复创建。
-
-#### 第一次运行常见问题
-
-1. 启动后提示无法连接 MySQL  
-   说明 `.env` 里的数据库地址不对，或者 MySQL 服务没启动。
-
-2. 中文显示异常  
-   需要检查 MySQL 是否使用 `utf8mb4` 字符集。
-
-3. 上传文件失败  
-   需要检查上传目录是否有写入权限。
+详情请见docs/协作开发指南.md
 
 ### 4.4 桌面版第一次运行
 
