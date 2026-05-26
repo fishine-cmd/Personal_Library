@@ -470,5 +470,228 @@
       }
     });
   })();
+
+  // PDF recognition (NEW) — inline right pane, supports auto-fill.
+  (function() {
+    const btnToggle = document.getElementById('btn-recognize-toggle');
+    if (!btnToggle) return;
+
+    const pane = document.getElementById('recognize-pane');
+    const formCol = document.getElementById('edit-form-col');
+    const fileInput = document.getElementById('recognize-file-hidden');
+
+    const rpUpload = document.getElementById('rp-upload');
+    const rpLoading = document.getElementById('rp-loading');
+    const rpResult = document.getElementById('rp-result');
+    const rpError = document.getElementById('rp-error');
+
+    const btnPickFile = document.getElementById('rp-btn-pick');
+    const btnCloseFromUpload = document.getElementById('rp-close-upload');
+    const btnCloseFromResult = document.getElementById('rp-close-result');
+    const btnCopy = document.getElementById('rp-btn-copy');
+    const btnDownload = document.getElementById('rp-btn-download');
+    const btnFill = document.getElementById('rp-btn-fill');
+    const btnNewPdf = document.getElementById('rp-btn-new-pdf');
+    const btnRetry = document.getElementById('rp-btn-retry');
+
+    const elFilename = document.getElementById('rp-filename');
+    const elCharcount = document.getElementById('rp-charcount');
+    const elMarkdown = document.getElementById('rp-markdown');
+    const elErrorBody = document.getElementById('rp-error-body');
+
+    let lastMarkdown = '';
+    let lastSuggested = null;
+    let lastFilename = '';
+
+    function showPane() {
+      pane.classList.remove('d-none');
+      formCol.classList.replace('col-lg-12', 'col-lg-8');
+    }
+    function hidePane() {
+      pane.classList.add('d-none');
+      formCol.classList.replace('col-lg-8', 'col-lg-12');
+    }
+    function isPaneVisible() {
+      return !pane.classList.contains('d-none');
+    }
+
+    function setState(name) {
+      [rpUpload, rpLoading, rpResult, rpError].forEach(el => el.classList.add('d-none'));
+      ({ upload: rpUpload, loading: rpLoading, result: rpResult, error: rpError }[name]).classList.remove('d-none');
+    }
+
+    function showResultState() {
+      elFilename.textContent = lastFilename;
+      elFilename.title = lastFilename;
+      elCharcount.textContent = `${lastMarkdown.length.toLocaleString()} 字符`;
+      elMarkdown.textContent = lastMarkdown;
+      setState('result');
+    }
+    function showErrorState(html) {
+      elErrorBody.innerHTML = html;
+      setState('error');
+    }
+    function clearData() {
+      lastMarkdown = '';
+      lastSuggested = null;
+      lastFilename = '';
+    }
+
+    async function recognize(file) {
+      setState('loading');
+      const fd = new FormData();
+      fd.append('pdf', file);
+      try {
+        const r = await fetch('{{ url_for("documents.recognize_pdf") }}', { method: 'POST', body: fd });
+        const text = await r.text();
+        let j;
+        try {
+          j = JSON.parse(text);
+        } catch (parseErr) {
+          let hint = '';
+          if (r.status === 404) hint = '该接口未注册 —— 你跑的可能是旧 exe，或没装新依赖。';
+          else if (r.status === 401 || r.status === 302) hint = '登录会话可能已失效，请刷新页面重新登录。';
+          else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 50MB）。';
+          else if (r.status >= 500) hint = '服务器内部错误，请查看 Flask 终端输出的 Python 报错。';
+          else hint = `HTTP ${r.status}。`;
+          showErrorState(`<strong>响应不是 JSON</strong><br>${hint}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${text.substring(0, 500).replace(/</g, '&lt;')}</pre></details>`);
+          return;
+        }
+        if (!j.ok) {
+          showErrorState(`识别失败：${j.error || '未知错误'}`);
+          return;
+        }
+        lastMarkdown = j.markdown || '';
+        lastSuggested = j.suggested_fields || null;
+        lastFilename = j.filename || file.name || 'mineru.pdf';
+        showResultState();
+      } catch (e) {
+        showErrorState(`请求失败：${e}`);
+      }
+    }
+
+    fileInput.addEventListener('change', () => {
+      if (!fileInput.files.length) return;
+      const file = fileInput.files[0];
+      recognize(file);
+      fileInput.value = '';
+    });
+
+    btnToggle.addEventListener('click', () => {
+      if (isPaneVisible()) {
+        hidePane();
+        return;
+      }
+      showPane();
+      if (lastMarkdown) {
+        showResultState();
+      } else {
+        setState('upload');
+        fileInput.click();
+      }
+    });
+
+    btnPickFile.addEventListener('click', () => fileInput.click());
+    btnCloseFromUpload.addEventListener('click', () => hidePane());
+    btnCloseFromResult.addEventListener('click', () => hidePane());
+
+    btnNewPdf.addEventListener('click', () => {
+      clearData();
+      setState('upload');
+      fileInput.click();
+    });
+
+    btnRetry.addEventListener('click', () => {
+      setState('upload');
+      fileInput.click();
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      if (!lastMarkdown) return;
+      try {
+        await navigator.clipboard.writeText(lastMarkdown);
+        const orig = btnCopy.textContent;
+        btnCopy.textContent = '已复制';
+        setTimeout(() => { btnCopy.textContent = orig; }, 1800);
+      } catch (e) {
+        showErrorState(`复制失败：${e}`);
+      }
+    });
+
+    btnDownload.addEventListener('click', () => {
+      if (!lastMarkdown) return;
+      const base = (lastFilename || 'mineru').replace(/\.pdf$/i, '');
+      const blob = new Blob([lastMarkdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${base}.md`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function packAuthors(authors, affiliations) {
+      if (!authors || authors.length === 0) return '';
+      const lines = [];
+      for (let i = 0; i < authors.length; i++) {
+        const name = authors[i];
+        const aff = (affiliations && affiliations.length === authors.length)
+          ? affiliations[i] : null;
+        lines.push(aff ? `${name} | ${aff}` : name);
+      }
+      return lines.join('\n');
+    }
+
+    const FIELD_MAP = [
+      { key: 'title',    label: '标题',    selector: 'input[name="title"]',            transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'year',     label: '出版年份', selector: 'input[name="publication_year"]', transform: v => (v == null || v === '' ? '' : String(v)) },
+      { key: 'doi',      label: 'DOI',     selector: 'input[name="doi"]',              transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'source',   label: '来源',    selector: 'input[name="source_name"]',      transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'abstract', label: '摘要',    selector: 'textarea[name="abstract"]',      transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'keywords', label: '关键词',   selector: 'input[name="keywords_raw"]',     transform: v => (Array.isArray(v) ? v.join(', ') : '') },
+    ];
+
+    function fillFormFromSuggested(s) {
+      if (!s) return;
+      const writes = [];
+
+      FIELD_MAP.forEach(m => {
+        const el = document.querySelector(m.selector);
+        if (!el) return;
+        const newVal = m.transform(s[m.key]);
+        if (!newVal) return;
+        writes.push({ el, label: m.label, oldVal: el.value, newVal });
+      });
+
+      const authorsEl = document.getElementById('authors-raw');
+      if (authorsEl) {
+        const newAuthors = packAuthors(s.authors, s.affiliations);
+        if (newAuthors) {
+          writes.push({ el: authorsEl, label: '作者', oldVal: authorsEl.value, newVal: newAuthors, isAuthors: true });
+        }
+      }
+
+      if (writes.length === 0) return;
+
+      const conflicts = writes.filter(w => (w.oldVal || '').trim() !== '');
+      if (conflicts.length > 0) {
+        const msg = '以下字段已有内容，是否覆盖？\n\n' +
+          conflicts.map(c => `• ${c.label}`).join('\n') +
+          '\n\n点"确定"将覆盖全部上述字段。';
+        if (!confirm(msg)) return;
+      }
+
+      writes.forEach(w => {
+        w.el.value = w.newVal;
+        if (w.isAuthors) {
+          w.el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }
+
+    btnFill.addEventListener('click', () => {
+      if (!lastSuggested) return;
+      fillFormFromSuggested(lastSuggested);
+    });
+  })();
 </script>
 {% endblock %}
