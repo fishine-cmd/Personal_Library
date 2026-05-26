@@ -3,10 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">{% if doc %}编辑文献{% else %}新增文献{% endif %}</h4>
-  <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recognizeModal">
-    <i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown
+  <button type="button" class="btn btn-sm btn-outline-primary" id="btn-recognize-toggle"
+          title="识别 PDF · 导出 Markdown">
+    <i class="bi bi-magic"></i> 识别 PDF
   </button>
 </div>
+<div class="row">
+  <div class="col-lg-12" id="edit-form-col">
+<input type="file" id="recognize-file-hidden" accept="application/pdf" class="d-none">
 
 <form method="post" enctype="multipart/form-data" class="row g-3">
   <div class="col-12">
@@ -131,40 +135,72 @@
 <datalist id="dl-sources"></datalist>
 <datalist id="dl-publishers"></datalist>
 
-<!-- Recognize PDF Modal -->
-<div class="modal fade" id="recognizeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3" id="recognize-upload-area">
-          <label class="form-label">PDF 文件</label>
-          <input type="file" id="recognize-file" class="form-control" accept="application/pdf">
-        </div>
+  </div><!-- /#edit-form-col -->
 
-        <div id="recognize-status" class="mb-3"></div>
+  <div class="col-lg-4 d-none" id="recognize-pane">
+    <div class="position-sticky" style="top: 70px;">
+      <div class="card">
+        <div class="card-body p-3" id="rp-body">
 
-        <div id="recognize-result" class="d-none">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>识别结果（Markdown）</strong>
-            <span class="small text-muted" id="recognize-filename"></span>
-          </div>
-          <pre id="markdown-preview" class="small bg-body-tertiary text-body p-2 rounded border"
-               style="max-height:420px;overflow:auto;white-space:pre-wrap"></pre>
+  <!-- 上传态 -->
+  <div id="rp-upload">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong><i class="bi bi-magic"></i> 识别 PDF</strong>
+      <button type="button" class="btn-close" id="rp-close-upload" aria-label="关闭"></button>
+    </div>
+    <div class="text-center py-4 border rounded bg-body-tertiary">
+      <i class="bi bi-file-earmark-pdf fs-1 text-muted d-block mb-2"></i>
+      <div class="mb-3 small text-muted">请选择一个 PDF 文件开始识别</div>
+      <button type="button" class="btn btn-primary btn-sm" id="rp-btn-pick">选择文件</button>
+    </div>
+  </div>
+
+  <!-- 加载态 -->
+  <div id="rp-loading" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong><i class="bi bi-magic"></i> 识别 PDF</strong>
+    </div>
+    <div class="alert alert-info py-3 mb-0 d-flex align-items-center">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      <div class="small">正在解析 PDF（数十秒到数分钟，请勿关闭页面）…</div>
+    </div>
+  </div>
+
+  <!-- 结果态 -->
+  <div id="rp-result" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+      <strong class="text-truncate" id="rp-filename" title=""></strong>
+      <button type="button" class="btn-close flex-shrink-0" id="rp-close-result" aria-label="关闭"></button>
+    </div>
+    <div class="small text-muted mb-2" id="rp-charcount"></div>
+    <div class="d-flex flex-wrap gap-1 mb-2">
+      <button type="button" class="btn btn-sm btn-success" id="rp-btn-fill" title="把识别出的字段写入左侧表单">
+        <i class="bi bi-magic"></i> 一键填入字段
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="rp-btn-copy">复制</button>
+      <button type="button" class="btn btn-sm btn-outline-success" id="rp-btn-download">下载</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="rp-btn-new-pdf">识别新 PDF</button>
+    </div>
+    <pre id="rp-markdown" class="small bg-body-tertiary text-body p-2 rounded border mb-0"
+         style="max-height: calc(100vh - 280px); overflow:auto; white-space:pre-wrap;"></pre>
+  </div>
+
+  <!-- 错误态 -->
+  <div id="rp-error" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong class="text-danger">识别失败</strong>
+    </div>
+    <div class="alert alert-danger py-2 small" id="rp-error-body"></div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="rp-btn-retry">重试</button>
+  </div>
+
         </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-        <button type="button" class="btn btn-outline-primary d-none" id="btn-copy-md">复制 Markdown</button>
-        <button type="button" class="btn btn-outline-success d-none" id="btn-download-md">下载 .md 文件</button>
-        <button type="button" class="btn btn-primary" id="btn-recognize">开始识别</button>
       </div>
     </div>
   </div>
-</div>
+
+</div><!-- /.row -->
+
 
 <script>
   // populate autocompletion datalists from /library/api
@@ -290,74 +326,81 @@
     schedule();
   })();
 
-  // PDF recognition - shows Markdown, supports download / copy.
+  // PDF recognition (NEW) — inline right pane, supports auto-fill.
   (function() {
-    const btnRecognize = document.getElementById('btn-recognize');
-    const btnDownload = document.getElementById('btn-download-md');
-    const btnCopy = document.getElementById('btn-copy-md');
-    const fileEl = document.getElementById('recognize-file');
-    const statusEl = document.getElementById('recognize-status');
-    const resultEl = document.getElementById('recognize-result');
-    const filenameEl = document.getElementById('recognize-filename');
-    const mdPre = document.getElementById('markdown-preview');
+    const btnToggle = document.getElementById('btn-recognize-toggle');
+    if (!btnToggle) return;
 
-    let lastMarkdown = '';
-    let lastDownloadName = 'mineru-result.md';
+    const pane = document.getElementById('recognize-pane');
+    const formCol = document.getElementById('edit-form-col');
+    const fileInput = document.getElementById('recognize-file-hidden');
 
-    function downloadFile(name, text) {
-      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = name;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+    const rpUpload = document.getElementById('rp-upload');
+    const rpLoading = document.getElementById('rp-loading');
+    const rpResult = document.getElementById('rp-result');
+    const rpError = document.getElementById('rp-error');
+
+    const btnPickFile = document.getElementById('rp-btn-pick');
+    const btnCloseFromUpload = document.getElementById('rp-close-upload');
+    const btnCloseFromResult = document.getElementById('rp-close-result');
+    const btnCopy = document.getElementById('rp-btn-copy');
+    const btnDownload = document.getElementById('rp-btn-download');
+    const btnFill = document.getElementById('rp-btn-fill');
+    const btnNewPdf = document.getElementById('rp-btn-new-pdf');
+    const btnRetry = document.getElementById('rp-btn-retry');
+
+    const elFilename = document.getElementById('rp-filename');
+    const elCharcount = document.getElementById('rp-charcount');
+    const elMarkdown = document.getElementById('rp-markdown');
+    const elErrorBody = document.getElementById('rp-error-body');
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    btnDownload.addEventListener('click', () => {
-      if (lastMarkdown) downloadFile(lastDownloadName, lastMarkdown);
-    });
+    let lastMarkdown = '';
+    let lastSuggested = null;
+    let lastFilename = '';
 
-    btnCopy.addEventListener('click', async () => {
-      if (!lastMarkdown) return;
-      try {
-        await navigator.clipboard.writeText(lastMarkdown);
-        btnCopy.textContent = '已复制';
-        setTimeout(() => btnCopy.textContent = '复制 Markdown', 1800);
-      } catch (e) {
-        statusEl.innerHTML = `<div class="alert alert-warning py-2">复制失败：${e}</div>`;
-      }
-    });
+    function showPane() {
+      pane.classList.remove('d-none');
+      formCol.classList.replace('col-lg-12', 'col-lg-8');
+    }
+    function hidePane() {
+      pane.classList.add('d-none');
+      formCol.classList.replace('col-lg-8', 'col-lg-12');
+    }
+    function isPaneVisible() {
+      return !pane.classList.contains('d-none');
+    }
 
-    document.getElementById('recognizeModal').addEventListener('show.bs.modal', () => {
-      statusEl.innerHTML = '';
-      resultEl.classList.add('d-none');
-      btnDownload.classList.add('d-none');
-      btnCopy.classList.add('d-none');
-      btnRecognize.classList.remove('d-none');
-      btnRecognize.disabled = false;
-      btnRecognize.textContent = '开始识别';
+    function setState(name) {
+      [rpUpload, rpLoading, rpResult, rpError].forEach(el => el.classList.add('d-none'));
+      ({ upload: rpUpload, loading: rpLoading, result: rpResult, error: rpError }[name]).classList.remove('d-none');
+    }
+
+    function showResultState() {
+      elFilename.textContent = lastFilename;
+      elFilename.title = lastFilename;
+      elCharcount.textContent = `${lastMarkdown.length.toLocaleString()} 字符`;
+      elMarkdown.textContent = lastMarkdown;
+      setState('result');
+    }
+    function showErrorState(html) {
+      elErrorBody.innerHTML = html;
+      setState('error');
+    }
+    function clearData() {
       lastMarkdown = '';
-    });
+      lastSuggested = null;
+      lastFilename = '';
+    }
 
-    btnRecognize.addEventListener('click', async () => {
-      if (!fileEl.files.length) {
-        statusEl.innerHTML = '<div class="alert alert-warning py-2">请先选择一个 PDF</div>';
-        return;
-      }
-      const file = fileEl.files[0];
+    async function recognize(file) {
+      setState('loading');
       const fd = new FormData();
       fd.append('pdf', file);
-
-      btnRecognize.disabled = true;
-      btnRecognize.textContent = '识别中...';
-      statusEl.innerHTML = `
-        <div class="alert alert-info py-2">
-          <div class="d-flex align-items-center">
-            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-            <div>正在解析 PDF（耗时数十秒到数分钟，请勿关闭窗口）…</div>
-          </div>
-        </div>`;
-
       try {
         const r = await fetch('{{ url_for("documents.recognize_pdf") }}', { method: 'POST', body: fd });
         const text = await r.text();
@@ -371,33 +414,143 @@
           else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 50MB）。';
           else if (r.status >= 500) hint = '服务器内部错误，请查看 Flask 终端输出的 Python 报错。';
           else hint = `HTTP ${r.status}。`;
-          statusEl.innerHTML = `<div class="alert alert-danger py-2"><strong>响应不是 JSON</strong><br>${hint}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${text.substring(0, 500).replace(/</g, '&lt;')}</pre></details></div>`;
-          btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+          showErrorState(`<strong>响应不是 JSON</strong><br>${escapeHtml(hint)}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${escapeHtml(text.substring(0, 500))}</pre></details>`);
           return;
         }
         if (!j.ok) {
-          statusEl.innerHTML = `<div class="alert alert-danger py-2">识别失败：${j.error}</div>`;
-          btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+          showErrorState(`识别失败：${escapeHtml(j.error || '未知错误')}`);
           return;
         }
-
-        const md = j.markdown || '';
-        lastMarkdown = md;
-        const base = (file.name || 'mineru').replace(/\.pdf$/i, '');
-        lastDownloadName = `${base}.md`;
-
-        filenameEl.textContent = `${file.name} · ${md.length.toLocaleString()} 字符`;
-        mdPre.textContent = md;
-        resultEl.classList.remove('d-none');
-        btnDownload.classList.remove('d-none');
-        btnCopy.classList.remove('d-none');
-        btnRecognize.classList.add('d-none');
-
-        statusEl.innerHTML = `<div class="alert alert-success py-2">识别完成</div>`;
+        lastMarkdown = j.markdown || '';
+        lastSuggested = j.suggested_fields || null;
+        lastFilename = j.filename || file.name || 'mineru.pdf';
+        showResultState();
       } catch (e) {
-        statusEl.innerHTML = `<div class="alert alert-danger py-2">请求失败：${e}</div>`;
-        btnRecognize.disabled = false; btnRecognize.textContent = '开始识别';
+        showErrorState(`请求失败：${escapeHtml(e)}`);
       }
+    }
+
+    fileInput.addEventListener('change', () => {
+      if (!fileInput.files.length) return;
+      const file = fileInput.files[0];
+      recognize(file);
+      fileInput.value = '';
+    });
+
+    btnToggle.addEventListener('click', () => {
+      if (isPaneVisible()) {
+        hidePane();
+        return;
+      }
+      showPane();
+      if (lastMarkdown) {
+        showResultState();
+      } else {
+        setState('upload');
+        fileInput.click();
+      }
+    });
+
+    btnPickFile.addEventListener('click', () => fileInput.click());
+    btnCloseFromUpload.addEventListener('click', () => hidePane());
+    btnCloseFromResult.addEventListener('click', () => hidePane());
+
+    btnNewPdf.addEventListener('click', () => {
+      clearData();
+      setState('upload');
+      fileInput.click();
+    });
+
+    btnRetry.addEventListener('click', () => {
+      setState('upload');
+      fileInput.click();
+    });
+
+    btnCopy.addEventListener('click', async () => {
+      if (!lastMarkdown) return;
+      try {
+        await navigator.clipboard.writeText(lastMarkdown);
+        const orig = btnCopy.textContent;
+        btnCopy.textContent = '已复制';
+        setTimeout(() => { btnCopy.textContent = orig; }, 1800);
+      } catch (e) {
+        showErrorState(`复制失败：${escapeHtml(e)}`);
+      }
+    });
+
+    btnDownload.addEventListener('click', () => {
+      if (!lastMarkdown) return;
+      const base = (lastFilename || 'mineru').replace(/\.pdf$/i, '');
+      const blob = new Blob([lastMarkdown], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${base}.md`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function packAuthors(authors, affiliations) {
+      if (!authors || authors.length === 0) return '';
+      const lines = [];
+      for (let i = 0; i < authors.length; i++) {
+        const name = authors[i];
+        const aff = (affiliations && affiliations.length === authors.length)
+          ? affiliations[i] : null;
+        lines.push(aff ? `${name} | ${aff}` : name);
+      }
+      return lines.join('\n');
+    }
+
+    const FIELD_MAP = [
+      { key: 'title',    label: '标题',    selector: 'input[name="title"]',            transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'year',     label: '出版年份', selector: 'input[name="publication_year"]', transform: v => (v == null || v === '' ? '' : String(v)) },
+      { key: 'doi',      label: 'DOI',     selector: 'input[name="doi"]',              transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'source',   label: '来源',    selector: 'input[name="source_name"]',      transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'abstract', label: '摘要',    selector: 'textarea[name="abstract"]',      transform: v => (typeof v === 'string' ? v.trim() : '') },
+      { key: 'keywords', label: '关键词',   selector: 'input[name="keywords_raw"]',     transform: v => (Array.isArray(v) ? v.join(', ') : '') },
+    ];
+
+    function fillFormFromSuggested(s) {
+      if (!s) return;
+      const writes = [];
+
+      FIELD_MAP.forEach(m => {
+        const el = document.querySelector(m.selector);
+        if (!el) return;
+        const newVal = m.transform(s[m.key]);
+        if (!newVal) return;
+        writes.push({ el, label: m.label, oldVal: el.value, newVal });
+      });
+
+      const authorsEl = document.getElementById('authors-raw');
+      if (authorsEl) {
+        const newAuthors = packAuthors(s.authors, s.affiliations);
+        if (newAuthors) {
+          writes.push({ el: authorsEl, label: '作者', oldVal: authorsEl.value, newVal: newAuthors, isAuthors: true });
+        }
+      }
+
+      if (writes.length === 0) return;
+
+      const conflicts = writes.filter(w => (w.oldVal || '').trim() !== '');
+      if (conflicts.length > 0) {
+        const msg = '以下字段已有内容，是否覆盖？\n\n' +
+          conflicts.map(c => `• ${c.label}`).join('\n') +
+          '\n\n点"确定"将覆盖全部上述字段。';
+        if (!confirm(msg)) return;
+      }
+
+      writes.forEach(w => {
+        w.el.value = w.newVal;
+        if (w.isAuthors) {
+          w.el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      });
+    }
+
+    btnFill.addEventListener('click', () => {
+      if (!lastSuggested) return;
+      fillFormFromSuggested(lastSuggested);
     });
   })();
 </script>
