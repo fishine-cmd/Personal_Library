@@ -201,40 +201,6 @@
 
 </div><!-- /.row -->
 
-<!-- Recognize PDF Modal -->
-<div class="modal fade" id="recognizeModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3" id="recognize-upload-area">
-          <label class="form-label">PDF 文件</label>
-          <input type="file" id="recognize-file" class="form-control" accept="application/pdf">
-        </div>
-
-        <div id="recognize-status" class="mb-3"></div>
-
-        <div id="recognize-result" class="d-none">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <strong>识别结果（Markdown）</strong>
-            <span class="small text-muted" id="recognize-filename"></span>
-          </div>
-          <pre id="markdown-preview" class="small bg-body-tertiary text-body p-2 rounded border"
-               style="max-height:420px;overflow:auto;white-space:pre-wrap"></pre>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-        <button type="button" class="btn btn-outline-primary d-none" id="btn-copy-md">复制 Markdown</button>
-        <button type="button" class="btn btn-outline-success d-none" id="btn-download-md">下载 .md 文件</button>
-        <button type="button" class="btn btn-primary" id="btn-recognize">开始识别</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <script>
   // populate autocompletion datalists from /library/api
