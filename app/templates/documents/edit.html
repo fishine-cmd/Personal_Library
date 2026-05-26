@@ -8,6 +8,8 @@
     <i class="bi bi-magic"></i> 识别 PDF
   </button>
 </div>
+<div class="row">
+  <div class="col-lg-12" id="edit-form-col">
 <input type="file" id="recognize-file-hidden" accept="application/pdf" class="d-none">
 
 <form method="post" enctype="multipart/form-data" class="row g-3">
@@ -132,6 +134,21 @@
 
 <datalist id="dl-sources"></datalist>
 <datalist id="dl-publishers"></datalist>
+
+  </div><!-- /#edit-form-col -->
+
+  <div class="col-lg-4 d-none" id="recognize-pane">
+    <div class="position-sticky" style="top: 70px;">
+      <div class="card">
+        <div class="card-body p-3" id="rp-body">
+          <!-- 状态化内容将在 Task 3 中填充 -->
+          <div class="text-muted small">（识别面板）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.row -->
 
 <!-- Recognize PDF Modal -->
 <div class="modal fade" id="recognizeModal" tabindex="-1" aria-hidden="true">
