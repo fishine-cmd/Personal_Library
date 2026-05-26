@@ -3,10 +3,12 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">{% if doc %}编辑文献{% else %}新增文献{% endif %}</h4>
-  <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#recognizeModal">
-    <i class="bi bi-magic"></i> 识别 PDF · 导出 Markdown
+  <button type="button" class="btn btn-sm btn-outline-primary" id="btn-recognize-toggle"
+          title="识别 PDF · 导出 Markdown">
+    <i class="bi bi-magic"></i> 识别 PDF
   </button>
 </div>
+<input type="file" id="recognize-file-hidden" accept="application/pdf" class="d-none">
 
 <form method="post" enctype="multipart/form-data" class="row g-3">
   <div class="col-12">
