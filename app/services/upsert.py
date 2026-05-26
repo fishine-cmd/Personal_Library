@@ -145,7 +145,7 @@ def get_or_create_source(
 def parse_csv_list(raw: str) -> List[str]:
     if not raw:
         return []
-    parts = [p.strip() for p in raw.replace(";", ",").split(",")]
+    parts = [p.strip() for p in re.split(r"[,;，；、]\s*", raw)]
     return [p for p in parts if p]
 
 

@@ -132,34 +132,57 @@ def _persist_document_form(document: Document, form, files):
 
     # authors: textarea, one per line, "name[#code] | aff1; aff2"
     parsed_authors = upsert.parse_authors_field(form.get("authors_raw", ""))
+
+    # 在 upsert 之前先按 (name, code) 去重，避免 allocate_new_author 被重复调用
+    seen, deduped = set(), []
+    for entry in parsed_authors:
+        key = (entry["name"], entry["code"])  # code 是 None / int / "new"
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(entry)
+    if len(deduped) < len(parsed_authors):
+        flash(f"已自动去除 {len(parsed_authors) - len(deduped)} 个重复作者", "info")
+    parsed_authors = deduped
+
     document.author_links.clear()
     db.session.flush()
-    for idx, entry in enumerate(parsed_authors, start=1):
+    seen_author_ids = set()
+    order = 0 # ← 先初始化计数器
+    for entry in parsed_authors:# ← 去掉 enumerate
         code_marker = entry["code"]
         if code_marker == "new":
             author = upsert.allocate_new_author(entry["name"], uid)
         elif isinstance(code_marker, int):
             author = upsert.get_or_create_author(entry["name"], uid, code=code_marker)
         else:
-            # name must be brand new; upsert raises if it's not
             author = upsert.get_or_create_author(entry["name"], uid)
+        if author.id in seen_author_ids:
+            continue
+        seen_author_ids.add(author.id)
+        order += 1# ← 只在通过去重后才自增
         for aff_name in entry["affiliations"]:
             aff = upsert.get_or_create_affiliation(aff_name, uid)
             if aff not in author.affiliations:
                 author.affiliations.append(aff)
         db.session.add(
             DocumentAuthor(
-                document_id=document.id, author_id=author.id, author_order=idx
+                document_id=document.id, author_id=author.id, author_order=order   # ← 用 order
             )
         )
-
     # keywords
     document.keywords.clear()
-    for kw_name in upsert.parse_csv_list(form.get("keywords_raw", "")):
+    raw_kws = upsert.parse_csv_list(form.get("keywords_raw", ""))
+    seen, deduped = set(), []
+    for k in raw_kws:
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped.append(k)
+    if len(deduped) < len(raw_kws):
+        flash(f"已自动去除 {len(raw_kws) - len(deduped)} 个重复关键词", "info")
+    for kw_name in deduped:
         document.keywords.append(upsert.get_or_create_keyword(kw_name, uid))
-
-    if files:
-        _save_uploaded_files(document, files)
 
 
 @bp.route("/")
