@@ -354,6 +354,11 @@
     const elMarkdown = document.getElementById('rp-markdown');
     const elErrorBody = document.getElementById('rp-error-body');
 
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     let lastMarkdown = '';
     let lastSuggested = null;
     let lastFilename = '';
@@ -409,11 +414,11 @@
           else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 50MB）。';
           else if (r.status >= 500) hint = '服务器内部错误，请查看 Flask 终端输出的 Python 报错。';
           else hint = `HTTP ${r.status}。`;
-          showErrorState(`<strong>响应不是 JSON</strong><br>${hint}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${text.substring(0, 500).replace(/</g, '&lt;')}</pre></details>`);
+          showErrorState(`<strong>响应不是 JSON</strong><br>${escapeHtml(hint)}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${escapeHtml(text.substring(0, 500))}</pre></details>`);
           return;
         }
         if (!j.ok) {
-          showErrorState(`识别失败：${j.error || '未知错误'}`);
+          showErrorState(`识别失败：${escapeHtml(j.error || '未知错误')}`);
           return;
         }
         lastMarkdown = j.markdown || '';
@@ -421,7 +426,7 @@
         lastFilename = j.filename || file.name || 'mineru.pdf';
         showResultState();
       } catch (e) {
-        showErrorState(`请求失败：${e}`);
+        showErrorState(`请求失败：${escapeHtml(e)}`);
       }
     }
 
@@ -469,7 +474,7 @@
         btnCopy.textContent = '已复制';
         setTimeout(() => { btnCopy.textContent = orig; }, 1800);
       } catch (e) {
-        showErrorState(`复制失败：${e}`);
+        showErrorState(`复制失败：${escapeHtml(e)}`);
       }
     });
 
