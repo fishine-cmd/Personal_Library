@@ -141,8 +141,59 @@
     <div class="position-sticky" style="top: 70px;">
       <div class="card">
         <div class="card-body p-3" id="rp-body">
-          <!-- 状态化内容将在 Task 3 中填充 -->
-          <div class="text-muted small">（识别面板）</div>
+
+  <!-- 上传态 -->
+  <div id="rp-upload">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong><i class="bi bi-magic"></i> 识别 PDF</strong>
+      <button type="button" class="btn-close" id="rp-close-upload" aria-label="关闭"></button>
+    </div>
+    <div class="text-center py-4 border rounded bg-body-tertiary">
+      <i class="bi bi-file-earmark-pdf fs-1 text-muted d-block mb-2"></i>
+      <div class="mb-3 small text-muted">请选择一个 PDF 文件开始识别</div>
+      <button type="button" class="btn btn-primary btn-sm" id="rp-btn-pick">选择文件</button>
+    </div>
+  </div>
+
+  <!-- 加载态 -->
+  <div id="rp-loading" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong><i class="bi bi-magic"></i> 识别 PDF</strong>
+    </div>
+    <div class="alert alert-info py-3 mb-0 d-flex align-items-center">
+      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+      <div class="small">正在解析 PDF（数十秒到数分钟，请勿关闭页面）…</div>
+    </div>
+  </div>
+
+  <!-- 结果态 -->
+  <div id="rp-result" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+      <strong class="text-truncate" id="rp-filename" title=""></strong>
+      <button type="button" class="btn-close flex-shrink-0" id="rp-close-result" aria-label="关闭"></button>
+    </div>
+    <div class="small text-muted mb-2" id="rp-charcount"></div>
+    <div class="d-flex flex-wrap gap-1 mb-2">
+      <button type="button" class="btn btn-sm btn-success" id="rp-btn-fill" title="把识别出的字段写入左侧表单">
+        <i class="bi bi-magic"></i> 一键填入字段
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="rp-btn-copy">复制</button>
+      <button type="button" class="btn btn-sm btn-outline-success" id="rp-btn-download">下载</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="rp-btn-new-pdf">识别新 PDF</button>
+    </div>
+    <pre id="rp-markdown" class="small bg-body-tertiary text-body p-2 rounded border mb-0"
+         style="max-height: calc(100vh - 280px); overflow:auto; white-space:pre-wrap;"></pre>
+  </div>
+
+  <!-- 错误态 -->
+  <div id="rp-error" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <strong class="text-danger">识别失败</strong>
+    </div>
+    <div class="alert alert-danger py-2 small" id="rp-error-body"></div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="rp-btn-retry">重试</button>
+  </div>
+
         </div>
       </div>
     </div>
