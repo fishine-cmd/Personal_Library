@@ -39,6 +39,7 @@ def create_app(env: str = "dev") -> Flask:
     from .blueprints.categories import bp as categories_bp
     from .blueprints.library import bp as library_bp
     from .blueprints.bibtex import bp as bibtex_bp
+    from .blueprints.batch_bibtex import bp as batch_bibtex_bp
     from .blueprints.settings import bp as settings_bp
 
     # 注册蓝图，并设置 URL 前缀
@@ -47,6 +48,7 @@ def create_app(env: str = "dev") -> Flask:
     app.register_blueprint(categories_bp, url_prefix="/categories")
     app.register_blueprint(library_bp, url_prefix="/library")
     app.register_blueprint(bibtex_bp, url_prefix="/bibtex")
+    app.register_blueprint(batch_bibtex_bp, url_prefix="/bibtex")
     app.register_blueprint(settings_bp, url_prefix="/settings")
 
     # 根路由 /

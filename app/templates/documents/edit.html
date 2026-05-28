@@ -411,7 +411,7 @@
           let hint = '';
           if (r.status === 404) hint = '该接口未注册 —— 你跑的可能是旧 exe，或没装新依赖。';
           else if (r.status === 401 || r.status === 302) hint = '登录会话可能已失效，请刷新页面重新登录。';
-          else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 50MB）。';
+          else if (r.status === 413) hint = 'PDF 文件超过大小限制（默认 200MB）。';
           else if (r.status >= 500) hint = '服务器内部错误，请查看 Flask 终端输出的 Python 报错。';
           else hint = `HTTP ${r.status}。`;
           showErrorState(`<strong>响应不是 JSON</strong><br>${escapeHtml(hint)}<br><details class="mt-2"><summary>原始响应（前 500 字符）</summary><pre class="small mt-1">${escapeHtml(text.substring(0, 500))}</pre></details>`);
