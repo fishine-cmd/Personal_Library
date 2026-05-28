@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from ..extensions import db
-from ..models import Category, UserSetting
+from ..models import Category, Document, UserSetting
 from ..services import bibtex_io, mineru_client
 from ..services.file_io import save_uploaded_files
 
@@ -33,10 +33,15 @@ def batch_page():
     uid = current_user.id
     categories = Category.query.filter_by(user_id=uid).order_by(Category.name).all()
     categories_payload = [{"id": c.id, "name": c.name} for c in categories]
+    latest_doc = Document.query.order_by(Document.id.desc()).first()
+    next_doc_id = (latest_doc.id if latest_doc else 0) + 1
+    supported_types = bibtex_io.supported_entry_types()
     return render_template(
         "bibtex/batch.html",
         categories=categories_payload,
         mineru_url=_get_mineru_url(uid),
+        next_doc_id=next_doc_id,
+        supported_types=supported_types,
     )
 
 
