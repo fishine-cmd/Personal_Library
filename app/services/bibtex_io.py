@@ -22,6 +22,11 @@ _BIB_TYPE_TO_DOCTYPE = {
 _DOCTYPE_TO_BIB_TYPE = {v: k for k, v in _BIB_TYPE_TO_DOCTYPE.items()}
 
 
+def supported_entry_types() -> list[str]:
+    """Return supported BibTeX entry types in stable display order."""
+    return list(_BIB_TYPE_TO_DOCTYPE.keys())
+
+
 def parse_entries(bib_text: str) -> list[dict]:
     """Parse .bib text into a list of entry dicts with no side effects."""
     if not bib_text or not bib_text.strip():

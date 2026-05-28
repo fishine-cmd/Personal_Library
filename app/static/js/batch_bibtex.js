@@ -11,6 +11,17 @@
   if (!root) return;
   const RECOGNIZE_URL = root.dataset.recognizeUrl;
   const IMPORT_URL = root.dataset.importUrl;
+  const NEXT_DOC_ID = Math.max(parseInt(root.dataset.nextDocId || "1", 10) || 1, 1);
+  let nextDocKey = NEXT_DOC_ID;
+  let supportedTypes = ["article"];
+  try {
+    const parsed = JSON.parse(root.dataset.supportedTypes || "[]");
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      supportedTypes = parsed.map((t) => String(t || "").toLowerCase()).filter(Boolean);
+    }
+  } catch (e) {
+    // keep default
+  }
 
   const els = {
     empty: document.getElementById("state-empty"),
@@ -35,6 +46,31 @@
   const items = [];
   let activeIdx = null;
   let queueBusy = false;
+
+  function buildBibTemplate(seq, entryType = supportedTypes[0] || "article") {
+    return `@${entryType}{doc${seq},
+  abstract = {},
+  author = {},
+  doi = {},
+  number = {},
+  pages = {},
+  publisher = {},
+  title = {},
+  volume = {},
+  year = {}
+}`;
+  }
+
+  function detectBibTypeTag(text) {
+    const m = String(text || "").trim().match(/^@(\w+)\s*\{/m);
+    if (!m) return `@${supportedTypes[0] || "article"}`;
+    return `@${m[1].toLowerCase()}`;
+  }
+
+  function allTypeHintsHtml() {
+    const tags = supportedTypes.map((t) => `@${t}`);
+    return tags.map((t) => `<code>${escapeHtml(t)}</code>`).join("、");
+  }
 
   function hashId(file) {
     return `${file.name}|${file.size}|${file.lastModified}`;
@@ -112,13 +148,16 @@
     for (const file of files) {
       const id = hashId(file);
       if (items.some((it) => it.id === id)) continue;
+      const seq = nextDocKey++;
+      const draft = loadDraft(id);
       items.push({
         id,
+        seq,
         file,
         filename: file.name,
         status: "queued",
         markdown: null,
-        bibText: loadDraft(id),
+        bibText: draft || buildBibTemplate(seq),
         errorMsg: null,
         documentId: null,
       });
@@ -166,7 +205,7 @@
     const hasFailed = items.some((it) => it.status === "rec_failed");
     els.retryBtn.disabled = !hasFailed || queueBusy;
     const canSubmit = items.some(
-      (it) => it.status === "recognized" && it.bibText.trim().length > 0
+      (it) => it.status === "recognized" && hasMeaningfulBibText(it)
     );
     els.submitBtn.disabled = !canSubmit || queueBusy;
   }
@@ -181,6 +220,12 @@
         "'": "&#39;",
       })[c]
     );
+  }
+
+  function hasMeaningfulBibText(it) {
+    const text = (it.bibText || "").trim();
+    if (!text) return false;
+    return text !== buildBibTemplate(it.seq || 1).trim();
   }
 
   async function pumpRecognizeQueue() {
@@ -266,23 +311,27 @@
 
   function updateBibFeedback(text) {
     const trimmed = text.trim();
+    const typeTag = detectBibTypeTag(trimmed);
+    const hintLine = `<span class="text-secondary">支持类型：${allTypeHintsHtml()}</span>`;
     if (!trimmed) {
-      els.bibFeedback.textContent = "（未填写；提交时将跳过此篇）";
+      els.bibFeedback.innerHTML =
+        `（未填写；提交时将跳过此篇）<br>${hintLine}`;
       els.bibFeedback.className = "small text-muted mt-2";
       return;
     }
     const matches = trimmed.match(/^@\w+\s*\{/gm) || [];
     if (matches.length === 0) {
-      els.bibFeedback.textContent = "格式可疑：未发现 @type{ 开头";
+      els.bibFeedback.innerHTML =
+        `格式可疑：未发现 @type{ 开头<br>${hintLine}`;
       els.bibFeedback.className = "small text-danger mt-2";
     } else if (matches.length === 1) {
-      els.bibFeedback.textContent = `已识别为 1 个条目（${matches[0].slice(
+      els.bibFeedback.innerHTML = `已识别为 1 个条目（${matches[0].slice(
         0,
         -1
-      )}）`;
+      )}）<br><span class="text-secondary">当前文献类型：<code>${escapeHtml(typeTag)}</code></span><br>${hintLine}`;
       els.bibFeedback.className = "small text-success mt-2";
     } else {
-      els.bibFeedback.textContent = `检测到 ${matches.length} 个条目：该输入框只能填 1 个，提交时会被拒绝`;
+      els.bibFeedback.innerHTML = `检测到 ${matches.length} 个条目：该输入框只能填 1 个，提交时会被拒绝<br><span class="text-secondary">当前文献类型：<code>${escapeHtml(typeTag)}</code></span><br>${hintLine}`;
       els.bibFeedback.className = "small text-danger mt-2";
     }
   }
@@ -332,7 +381,7 @@
         continue;
       }
       if (it.status !== "recognized" && it.status !== "import_failed") continue;
-      if (!it.bibText.trim()) {
+      if (!hasMeaningfulBibText(it)) {
         it.status = "skipped";
         it.errorMsg = "未填写 .bib";
         skipped++;
