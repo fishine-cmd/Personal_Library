@@ -30,6 +30,7 @@ from ..models import (
     UserSetting,
 )
 from ..services import upsert, mineru_client, pdf_metadata, dict_cleanup
+from ..services.file_io import save_uploaded_files as _save_uploaded_files_impl
 
 bp = Blueprint("documents", __name__)
 
@@ -79,29 +80,9 @@ def _ordered_categories(user_id: int) -> list:
 
 
 def _save_uploaded_files(document: Document, files):
-    upload_root = Path(current_app.config["UPLOAD_FOLDER"])
-    user_dir = upload_root / str(current_user.id)
-    user_dir.mkdir(parents=True, exist_ok=True)
-
-    for f in files:
-        if not f or not f.filename:
-            continue
-        if not _allowed_file(f.filename):
-            flash(f"跳过不允许的文件类型: {f.filename}", "warning")
-            continue
-        original = secure_filename(f.filename) or "file"
-        ext = original.rsplit(".", 1)[-1] if "." in original else "bin"
-        stored = f"{uuid.uuid4().hex}.{ext}"
-        target = user_dir / stored
-        f.save(target)
-        file_record = File(
-            document_id=document.id,
-            file_path=str(Path(str(current_user.id)) / stored).replace("\\", "/"),
-            original_name=original,
-            file_size=target.stat().st_size,
-            mime_type=f.mimetype or "",
-        )
-        db.session.add(file_record)
+    _, skipped = _save_uploaded_files_impl(document, files, current_user.id)
+    for name in skipped:
+        flash(f"跳过不允许的文件类型: {name}", "warning")
 
 
 def _persist_document_form(document: Document, form, files):

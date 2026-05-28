@@ -22,79 +22,107 @@ _BIB_TYPE_TO_DOCTYPE = {
 _DOCTYPE_TO_BIB_TYPE = {v: k for k, v in _BIB_TYPE_TO_DOCTYPE.items()}
 
 
-def import_bibtex(bib_text: str, user_id: int) -> Tuple[int, int]:
-    """Parse a .bib string and create Documents. Returns (created, skipped)."""
+def parse_entries(bib_text: str) -> list[dict]:
+    """Parse .bib text into a list of entry dicts with no side effects."""
+    if not bib_text or not bib_text.strip():
+        return []
     parser = bibtexparser.bparser.BibTexParser(common_strings=True)
     parser.ignore_nonstandard_types = False
     bib_db = bibtexparser.loads(bib_text, parser=parser)
+    return bib_db.entries
+
+
+def import_single_entry(
+    entry: dict, user_id: int, category_id: int | None = None
+) -> dict:
+    """Persist one bibtex entry and return created/skipped outcome.
+
+    Returns:
+        {"created": Document | None, "skipped_reason": str | None}
+    """
+    title = entry.get("title", "").strip().strip("{}")
+    if not title:
+        return {"created": None, "skipped_reason": "缺少 title 字段"}
+
+    doi = entry.get("doi", "").strip() or None
+    year_raw = entry.get("year", "").strip()
+    try:
+        year = int(year_raw) if year_raw else None
+    except ValueError:
+        year = None
+
+    existing = None
+    if doi:
+        existing = Document.query.filter_by(user_id=user_id, doi=doi).first()
+    if not existing:
+        existing = Document.query.filter_by(
+            user_id=user_id, title=title, publication_year=year
+        ).first()
+    if existing:
+        return {
+            "created": None,
+            "skipped_reason": f"已存在文献 ID {existing.id}: {existing.title}",
+        }
+
+    bib_type = entry.get("ENTRYTYPE", "misc").lower()
+    doc_type = _BIB_TYPE_TO_DOCTYPE.get(bib_type, "other")
+
+    journal = entry.get("journal") or entry.get("booktitle")
+    publisher = entry.get("publisher")
+    source_type = (
+        "journal"
+        if bib_type == "article"
+        else ("conference" if bib_type in ("inproceedings", "conference") else "other")
+    )
+    source = (
+        upsert.get_or_create_source(journal, user_id, source_type, publisher)
+        if journal
+        else None
+    )
+
+    doc = Document(
+        user_id=user_id,
+        title=title,
+        abstract=entry.get("abstract"),
+        document_type=doc_type,
+        publication_year=year,
+        volume=entry.get("volume"),
+        issue=entry.get("number") or entry.get("issue"),
+        pages=entry.get("pages"),
+        doi=doi,
+        source=source,
+        category_id=category_id,
+    )
+    db.session.add(doc)
+    db.session.flush()
+
+    authors_raw = entry.get("author", "")
+    author_names = [a.strip() for a in authors_raw.split(" and ") if a.strip()]
+    for i, name in enumerate(author_names, start=1):
+        author = upsert.get_or_create_author_lenient(name, user_id)
+        db.session.add(
+            DocumentAuthor(document_id=doc.id, author_id=author.id, author_order=i)
+        )
+
+    kw_raw = entry.get("keywords", "")
+    for kw_name in upsert.parse_csv_list(kw_raw):
+        doc.keywords.append(upsert.get_or_create_keyword(kw_name, user_id))
+
+    return {"created": doc, "skipped_reason": None}
+
+
+def import_bibtex(bib_text: str, user_id: int) -> Tuple[int, int]:
+    """Parse a .bib string and create Documents. Returns (created, skipped)."""
+    entries = parse_entries(bib_text)
 
     created = 0
     skipped = 0
-    for entry in bib_db.entries:
-        title = entry.get("title", "").strip().strip("{}")
-        if not title:
+    for entry in entries:
+        result = import_single_entry(entry, user_id)
+        if result["created"]:
+            created += 1
+        else:
             skipped += 1
-            continue
-        doi = entry.get("doi", "").strip() or None
-        year_raw = entry.get("year", "").strip()
-        try:
-            year = int(year_raw) if year_raw else None
-        except ValueError:
-            year = None
-
-        existing = None
-        if doi:
-            existing = Document.query.filter_by(user_id=user_id, doi=doi).first()
-        if not existing:
-            existing = Document.query.filter_by(
-                user_id=user_id, title=title, publication_year=year
-            ).first()
-        if existing:
-            skipped += 1
-            continue
-
-        bib_type = entry.get("ENTRYTYPE", "misc").lower()
-        doc_type = _BIB_TYPE_TO_DOCTYPE.get(bib_type, "other")
-
-        journal = entry.get("journal") or entry.get("booktitle")
-        publisher = entry.get("publisher")
-        source_type = "journal" if bib_type == "article" else (
-            "conference" if bib_type in ("inproceedings", "conference") else "other"
-        )
-        source = upsert.get_or_create_source(journal, user_id, source_type, publisher) if journal else None
-
-        doc = Document(
-            user_id=user_id,
-            title=title,
-            abstract=entry.get("abstract"),
-            document_type=doc_type,
-            publication_year=year,
-            volume=entry.get("volume"),
-            issue=entry.get("number") or entry.get("issue"),
-            pages=entry.get("pages"),
-            doi=doi,
-            source=source,
-        )
-        db.session.add(doc)
-        db.session.flush()
-
-        # authors: "Last, First and Last2, First2"
-        authors_raw = entry.get("author", "")
-        author_names = [a.strip() for a in authors_raw.split(" and ") if a.strip()]
-        for i, name in enumerate(author_names, start=1):
-            author = upsert.get_or_create_author_lenient(name, user_id)
-            db.session.add(
-                DocumentAuthor(
-                    document_id=doc.id, author_id=author.id, author_order=i
-                )
-            )
-
-        # keywords
-        kw_raw = entry.get("keywords", "")
-        for kw_name in upsert.parse_csv_list(kw_raw):
-            doc.keywords.append(upsert.get_or_create_keyword(kw_name, user_id))
-
-        created += 1
 
     db.session.commit()
     return created, skipped

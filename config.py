@@ -16,7 +16,7 @@ class BaseConfig:
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
     UPLOAD_FOLDER = str(BASE_DIR / os.getenv("UPLOAD_FOLDER", "uploads"))
-    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 52428800))
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 209715200))
     ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "txt", "ps", "epub"}
 
 

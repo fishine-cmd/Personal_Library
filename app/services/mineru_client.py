@@ -49,7 +49,7 @@ def parse_pdf(
     *,
     backend: str = "pipeline",
     lang: str = "ch",
-    timeout: float = 600.0,
+    timeout: float = 3600.0,
 ) -> dict:
     """Run the PDF through MinerU. Returns {'md': str, 'content_list': list}."""
     base = _normalize_base_url(base_url)
@@ -68,7 +68,6 @@ def parse_pdf(
         "return_model_output": "false",
         "response_format_zip": "false",
         "start_page_id": "0",
-        "end_page_id": "2",  # only the first three pages — metadata lives there
     }
     try:
         resp = requests.post(f"{base}/file_parse", files=files, data=data, timeout=timeout)
