@@ -307,6 +307,109 @@ class UserSetting(db.Model):
     )
 
 
+class AIAgentSetting(db.Model):
+    """Per-user screen AI agent configuration."""
+    __tablename__ = "ai_agent_settings"
+
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), primary_key=True
+    )
+    agent_name = db.Column(db.String(64), nullable=False, default="小咪")
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    scale = db.Column(db.Float, nullable=False, default=1.0)
+    facing = db.Column(db.String(8), nullable=False, default="right")
+    position_x = db.Column(db.Integer, nullable=False, default=24)
+    position_y = db.Column(db.Integer, nullable=False, default=24)
+    api_url = db.Column(db.String(512))
+    api_key = db.Column(db.String(512))
+    model = db.Column(db.String(64))
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("ai_agent_setting", uselist=False, cascade="all, delete-orphan"),
+    )
+
+
+class AIAgentActivity(db.Model):
+    """Per-user activity log used by the screen AI agent journal."""
+    __tablename__ = "ai_agent_activities"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    event_type = db.Column(db.String(64), nullable=False, index=True)
+    label = db.Column(db.String(256), nullable=False)
+    metadata_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("ai_agent_activities", cascade="all, delete-orphan"),
+    )
+
+
+class AIAgentJournal(db.Model):
+    """Per-user generated AI journals (daily/weekly) persisted for calendar view."""
+    __tablename__ = "ai_agent_journals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    period = db.Column(
+        db.Enum("daily", "weekly", name="ai_journal_period"),
+        nullable=False,
+        index=True,
+    )
+    start_date = db.Column(db.Date, nullable=False, index=True)
+    end_date = db.Column(db.Date, nullable=False, index=True)
+    title = db.Column(db.String(128), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+    updated_at = db.Column(
+        db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("ai_agent_journals", cascade="all, delete-orphan"),
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "user_id", "period", "start_date", name="uq_ai_journal_user_period_start"
+        ),
+    )
+
+
+class MergeAudit(db.Model):
+    """Persistent audit log for dictionary merge / rollback operations."""
+    __tablename__ = "merge_audits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    action = db.Column(
+        db.Enum("merge_apply", "merge_rollback", name="merge_audit_action"),
+        nullable=False,
+    )
+    target_audit_id = db.Column(
+        db.Integer, db.ForeignKey("merge_audits.id"), nullable=True, index=True
+    )
+    summary_json = db.Column(db.Text, nullable=False, default="{}")
+    payload_json = db.Column(db.Text, nullable=False, default="{}")
+    rolled_back_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+
+    target_audit = db.relationship("MergeAudit", remote_side=[id], uselist=False)
+
+
 class File(db.Model):
     __tablename__ = "files"
 

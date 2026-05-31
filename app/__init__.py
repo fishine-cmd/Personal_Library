@@ -41,6 +41,8 @@ def create_app(env: str = "dev") -> Flask:
     from .blueprints.bibtex import bp as bibtex_bp
     from .blueprints.batch_bibtex import bp as batch_bibtex_bp
     from .blueprints.settings import bp as settings_bp
+    from .blueprints.ai_agent import bp as ai_agent_bp
+    from .blueprints.journals import bp as journals_bp
 
     # 注册蓝图，并设置 URL 前缀
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -50,6 +52,8 @@ def create_app(env: str = "dev") -> Flask:
     app.register_blueprint(bibtex_bp, url_prefix="/bibtex")
     app.register_blueprint(batch_bibtex_bp, url_prefix="/bibtex")
     app.register_blueprint(settings_bp, url_prefix="/settings")
+    app.register_blueprint(ai_agent_bp, url_prefix="/ai-agent")
+    app.register_blueprint(journals_bp, url_prefix="/journals")
 
     # 根路由 /
     @app.route("/")

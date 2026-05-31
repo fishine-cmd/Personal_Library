@@ -39,6 +39,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('categories.list_categories') }}">分类</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('library.index') }}">字典表</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('bibtex.import_form') }}">BibTeX</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('journals.index') }}">日志</a></li>
       </ul>
       <ul class="navbar-nav align-items-center">
         <li class="nav-item me-2">
@@ -80,11 +81,25 @@
   {% block content %}{% endblock %}
 </main>
 
+{% if current_user.is_authenticated %}
+<div id="ai-agent-root" class="ai-agent-root" aria-hidden="true"
+     data-state-url="{{ url_for('ai_agent.api_state') }}"
+     data-activity-url="{{ url_for('ai_agent.api_activity') }}"
+     data-journal-today-url="{{ url_for('ai_agent.journal_today') }}"
+     data-journal-week-url="{{ url_for('ai_agent.journal_week') }}"
+     data-idle-src="{{ url_for('static', filename='img/ai_agent_idle.png') }}"
+     data-journaling-src="{{ url_for('static', filename='img/ai_agent_journaling.png') }}">
+</div>
+{% endif %}
+
 <footer class="text-center text-muted py-4 small">
   Personal Library
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% if current_user.is_authenticated %}
+<script src="{{ url_for('static', filename='js/ai_agent.js') }}"></script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

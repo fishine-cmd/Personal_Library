@@ -9,6 +9,7 @@ from flask_login import current_user, login_required
 from ..extensions import db
 from ..models import Category, Document, UserSetting
 from ..services import bibtex_io, mineru_client
+from ..services.ai_agent import record_activity
 from ..services.file_io import save_uploaded_files
 
 bp = Blueprint("batch_bibtex", __name__)
@@ -65,6 +66,12 @@ def recognize():
     except mineru_client.MineruError as e:
         return jsonify(ok=False, error=str(e)), 502
 
+    record_activity(
+        current_user.id,
+        "pdf_recognize",
+        "批量识别 PDF",
+        {"filename": f.filename},
+    )
     return jsonify(ok=True, filename=f.filename, markdown=parsed.get("md", ""))
 
 
@@ -136,6 +143,12 @@ def import_one():
             detail += " | cleanup_errors=" + "; ".join(cleanup_errors)
         return jsonify(ok=False, reason="save_failed", error_detail=detail)
 
+    record_activity(
+        current_user.id,
+        "bibtex_batch_import",
+        "批量导入 BibTeX + PDF",
+        {"document_id": doc.id, "filename": f.filename},
+    )
     return jsonify(ok=True, document_id=doc.id, title=doc.title)
 
 
