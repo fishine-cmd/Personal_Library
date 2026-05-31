@@ -62,6 +62,7 @@ const CLEANUP_SECTIONS = [
   ['出版社', 'publishers'],
   ['期刊 / 会议', 'sources'],
   ['关键词', 'keywords'],
+  ['标签', 'tags'],
 ];
 
 function plEscape(s) {
@@ -176,7 +177,8 @@ document.getElementById('btn-cleanup-apply').addEventListener('click', async () 
         `单位 ${d.affiliations || 0}`,
         `出版社 ${d.publishers || 0}`,
         `来源 ${d.sources || 0}`,
-        `关键词 ${d.keywords || 0}`
+        `关键词 ${d.keywords || 0}`,
+        `标签 ${d.tags || 0}`
       ].join('  ·  ');
       alert(`清理完成。已删除：\n${summary}`);
       location.reload();
@@ -260,6 +262,41 @@ document.getElementById('btn-cleanup-apply').addEventListener('click', async () 
         <li class="list-group-item d-flex justify-content-between align-items-center">
           <div>{{ p.name }}<div class="small text-muted">{{ p.sources|length }} 个来源</div></div>
           <form method="post" action="{{ url_for('library.delete_publisher', pub_id=p.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}<li class="list-group-item text-muted">空</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">关键词 <span class="badge bg-secondary">{{ keywords|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for k in keywords %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>{{ k.name }}<div class="small text-muted">{{ k.documents|length }} 篇文献</div></div>
+          <form method="post" action="{{ url_for('library.delete_keyword', kw_id=k.id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
+          </form>
+        </li>
+        {% else %}<li class="list-group-item text-muted">空</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card mb-3">
+      <div class="card-header">标签 <span class="badge bg-secondary">{{ tags|length }}</span></div>
+      <ul class="list-group list-group-flush" style="max-height:380px;overflow:auto">
+        {% for t in tags %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{{ url_for('documents.list_documents', tag=t.name) }}">{{ t.name }}</a>
+            <div class="small text-muted">{{ t.documents|length }} 篇文献</div>
+          </div>
+          <form method="post" action="{{ url_for('library.delete_tag', tag_id=t.id) }}">
             <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('删除？');">×</button>
           </form>
         </li>

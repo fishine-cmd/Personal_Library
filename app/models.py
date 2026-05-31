@@ -173,6 +173,24 @@ class Keyword(db.Model):
     )
 
 
+class Tag(db.Model):
+    __tablename__ = "tags"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    name = db.Column(db.String(128), nullable=False)
+
+    documents = db.relationship(
+        "Document", secondary="document_tags", back_populates="tags"
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_tag_user_name"),
+    )
+
+
 class Document(db.Model):
     __tablename__ = "documents"
 
@@ -225,6 +243,9 @@ class Document(db.Model):
     keywords = db.relationship(
         "Keyword", secondary="document_keywords", back_populates="documents"
     )
+    tags = db.relationship(
+        "Tag", secondary="document_tags", back_populates="documents"
+    )
     files = db.relationship(
         "File", back_populates="document", cascade="all, delete-orphan"
     )
@@ -240,6 +261,10 @@ class Document(db.Model):
     @property
     def keywords_display(self) -> str:
         return ", ".join(k.name for k in self.keywords)
+
+    @property
+    def tags_display(self) -> str:
+        return ", ".join(t.name for t in self.tags)
 
 
 class DocumentAuthor(db.Model):
@@ -258,6 +283,13 @@ class DocumentKeyword(db.Model):
 
     document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), primary_key=True)
     keyword_id = db.Column(db.Integer, db.ForeignKey("keywords.id"), primary_key=True)
+
+
+class DocumentTag(db.Model):
+    __tablename__ = "document_tags"
+
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), primary_key=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey("tags.id"), primary_key=True)
 
 
 class UserSetting(db.Model):
