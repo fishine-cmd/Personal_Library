@@ -30,6 +30,7 @@ from ..models import (
     UserSetting,
 )
 from ..services import upsert, mineru_client, pdf_metadata, dict_cleanup
+from ..services.ai_agent import record_activity
 from ..services.file_io import save_uploaded_files as _save_uploaded_files_impl
 
 bp = Blueprint("documents", __name__)
@@ -247,6 +248,12 @@ def new():
             db.session.rollback()
             flash(f"保存失败: {e}", "danger")
             return redirect(url_for("documents.new"))
+        record_activity(
+            current_user.id,
+            "document_create",
+            "Create document",
+            {"document_id": doc.id, "title": doc.title},
+        )
         flash("文献已创建", "success")
         return redirect(url_for("documents.detail", doc_id=doc.id))
 
@@ -272,6 +279,12 @@ def edit(doc_id):
             db.session.rollback()
             flash(f"保存失败: {e}", "danger")
             return redirect(url_for("documents.edit", doc_id=doc_id))
+        record_activity(
+            current_user.id,
+            "document_edit",
+            "Edit document",
+            {"document_id": doc.id, "title": doc.title},
+        )
         flash("已保存", "success")
         return redirect(url_for("documents.detail", doc_id=doc.id))
 
@@ -404,6 +417,12 @@ def recognize_pdf():
     meta = pdf_metadata.extract_metadata(parsed)
     markdown = _build_combined_markdown(f.filename, meta, parsed.get("md", ""))
 
+    record_activity(
+        current_user.id,
+        "pdf_recognize",
+        "Recognize PDF",
+        {"filename": f.filename},
+    )
     return jsonify(
         ok=True,
         filename=f.filename,
@@ -444,6 +463,12 @@ def delete(doc_id):
         related_authors, related_keywords, related_source
     )
     db.session.commit()
+    record_activity(
+        current_user.id,
+        "document_delete",
+        "Delete document",
+        {"document_id": doc_id},
+    )
 
     labels = {
         "keywords": "关键词", "authors": "作者", "affiliations": "单位",
@@ -460,6 +485,12 @@ def delete(doc_id):
 def download_file(doc_id, file_id):
     doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
     file_record = File.query.filter_by(id=file_id, document_id=doc.id).first_or_404()
+    record_activity(
+        current_user.id,
+        "file_download",
+        "Download attachment",
+        {"document_id": doc.id, "file_id": file_id, "filename": file_record.original_name},
+    )
     upload_root = current_app.config["UPLOAD_FOLDER"]
     return send_from_directory(
         upload_root,
@@ -481,5 +512,11 @@ def delete_file(doc_id, file_id):
         pass
     db.session.delete(file_record)
     db.session.commit()
+    record_activity(
+        current_user.id,
+        "file_delete",
+        "Delete attachment",
+        {"document_id": doc.id, "file_id": file_id, "filename": file_record.original_name},
+    )
     flash("附件已删除", "info")
     return redirect(url_for("documents.detail", doc_id=doc_id))

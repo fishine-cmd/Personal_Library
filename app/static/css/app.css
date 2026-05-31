@@ -507,3 +507,195 @@ a:hover {
     display: none !important;
   }
 }
+
+/* AI Agent */
+.ai-agent-root {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: 2550;
+  pointer-events: none;
+}
+
+.ai-agent-shell {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  width: 200px;
+  height: 200px;
+  --ai-agent-scale: 1;
+  --ai-agent-name-bg: rgba(16, 16, 16, 0.82);
+  --ai-agent-name-fg: #f4f6ee;
+  transform-origin: left bottom;
+  transform: translate3d(0, 0, 0) scale(var(--ai-agent-scale));
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.18));
+}
+
+.ai-agent-shell.is-hidden {
+  display: none;
+}
+
+.ai-agent-reopen {
+  position: fixed;
+  left: 22px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+  pointer-events: auto;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.ai-agent-reopen i {
+  font-size: 0.9rem;
+}
+
+.ai-agent-reopen:hover {
+  background: color-mix(in srgb, var(--accent) 82%, transparent);
+}
+
+.ai-agent-reopen.is-hidden {
+  display: none;
+}
+
+[data-theme="dark"] .ai-agent-shell {
+  --ai-agent-name-bg: rgba(245, 245, 245, 0.9);
+  --ai-agent-name-fg: #101010;
+}
+
+.ai-agent-avatar {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  display: block;
+  cursor: grab;
+}
+
+.ai-agent-avatar:active {
+  cursor: grabbing;
+}
+
+.ai-agent-avatar img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.ai-agent-shell.is-facing-left .ai-agent-image {
+  transform: scaleX(-1);
+}
+
+.ai-agent-label {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  max-width: 184px;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: var(--ai-agent-name-bg);
+  color: var(--ai-agent-name-fg);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.ai-agent-menu {
+  position: absolute;
+  left: 204px;
+  bottom: 0;
+  width: 250px;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+}
+
+.ai-agent-menu[hidden] {
+  display: none !important;
+}
+
+.ai-agent-menu__row + .ai-agent-menu__row {
+  margin-top: 0.5rem;
+}
+
+.ai-agent-menu__title {
+  font-weight: 700;
+  margin-bottom: 0.55rem;
+}
+
+.ai-agent-menu__output {
+  max-height: 180px;
+  overflow: auto;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+  background: var(--input-bg);
+}
+
+.ai-agent-menu__mini {
+  font-size: 0.85rem;
+}
+
+.ai-agent-menu .btn {
+  white-space: nowrap;
+}
+
+/* Keep the "today journal" action visually lighter than global primary buttons. */
+.ai-agent-menu [data-agent-journal="today"] {
+  background-color: transparent !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+[data-theme="dark"] .ai-agent-menu [data-agent-journal="today"] {
+  color: var(--primary) !important;
+}
+
+@media (max-width: 768px) {
+  .ai-agent-shell {
+    left: 12px;
+    bottom: 12px;
+    transform-origin: left bottom;
+  }
+
+  .ai-agent-menu {
+    left: 0;
+    bottom: 210px;
+    width: min(84vw, 280px);
+  }
+  .ai-agent-reopen {
+    left: 12px;
+    bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-agent-shell,
+  .ai-agent-reopen,
+  .ai-agent-avatar,
+  .ai-agent-menu {
+    transition: none !important;
+  }
+}

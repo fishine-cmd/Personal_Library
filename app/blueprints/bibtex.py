@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
-from flask_login import login_required, current_user
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 
 from ..models import Document
 from ..services import bibtex_io
+from ..services.ai_agent import record_activity
 
 bp = Blueprint("bibtex", __name__)
 
@@ -23,6 +24,12 @@ def import_form():
         except Exception as e:
             flash(f"解析失败: {e}", "danger")
             return redirect(url_for("bibtex.import_form"))
+        record_activity(
+            current_user.id,
+            "bibtex_import",
+            "导入 BibTeX",
+            {"created": created, "skipped": skipped},
+        )
         flash(f"导入完成：新建 {created} 篇，跳过 {skipped} 篇（重复或无标题）", "success")
         return redirect(url_for("documents.list_documents"))
     return render_template("bibtex/import.html")
@@ -33,6 +40,7 @@ def import_form():
 def export_all():
     docs = Document.query.filter_by(user_id=current_user.id).all()
     bib = bibtex_io.export_bibtex(docs)
+    record_activity(current_user.id, "bibtex_export", "导出全部 BibTeX", {"count": len(docs)})
     return Response(
         bib,
         mimetype="application/x-bibtex",
@@ -45,6 +53,7 @@ def export_all():
 def export_one(doc_id):
     doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
     bib = bibtex_io.export_bibtex([doc])
+    record_activity(current_user.id, "bibtex_export", "导出单篇 BibTeX", {"document_id": doc.id})
     return Response(
         bib,
         mimetype="application/x-bibtex",

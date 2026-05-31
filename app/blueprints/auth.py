@@ -3,6 +3,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 
 from ..extensions import db
 from ..models import User
+from ..services.ai_agent import record_activity
 
 bp = Blueprint("auth", __name__)
 
@@ -35,6 +36,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
+        record_activity(user.id, "auth_register", "注册并登录")
         flash("注册成功！", "success")
         return redirect(url_for("documents.list_documents"))
     return render_template("auth/register.html")
@@ -52,6 +54,7 @@ def login():
             flash("用户名或密码错误", "danger")
             return render_template("auth/login.html")
         login_user(user, remember=bool(request.form.get("remember")))
+        record_activity(user.id, "auth_login", "登录系统")
         next_url = request.args.get("next") or url_for("documents.list_documents")
         return redirect(next_url)
     return render_template("auth/login.html")
@@ -60,6 +63,7 @@ def login():
 @bp.route("/logout")
 @login_required
 def logout():
+    record_activity(current_user.id, "auth_logout", "退出登录")
     logout_user()
     flash("已退出登录", "info")
     return redirect(url_for("auth.login"))
