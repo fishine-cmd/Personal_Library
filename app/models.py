@@ -275,6 +275,29 @@ class UserSetting(db.Model):
     )
 
 
+class MergeAudit(db.Model):
+    """Persistent audit log for dictionary merge / rollback operations."""
+    __tablename__ = "merge_audits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    action = db.Column(
+        db.Enum("merge_apply", "merge_rollback", name="merge_audit_action"),
+        nullable=False,
+    )
+    target_audit_id = db.Column(
+        db.Integer, db.ForeignKey("merge_audits.id"), nullable=True, index=True
+    )
+    summary_json = db.Column(db.Text, nullable=False, default="{}")
+    payload_json = db.Column(db.Text, nullable=False, default="{}")
+    rolled_back_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
+
+    target_audit = db.relationship("MergeAudit", remote_side=[id], uselist=False)
+
+
 class File(db.Model):
     __tablename__ = "files"
 

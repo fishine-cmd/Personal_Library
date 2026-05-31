@@ -1,24 +1,201 @@
 {% extends "base.html" %}
 {% block title %}文献列表{% endblock %}
 {% block content %}
+<style>
+  .doc-cat-card {
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--bs-border-color) 76%, transparent);
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(20, 28, 38, .08);
+  }
+  .doc-cat-head {
+    background: color-mix(in srgb, var(--bs-body-bg) 86%, var(--bs-secondary-bg));
+    border-bottom: 1px solid color-mix(in srgb, var(--bs-border-color) 80%, transparent);
+  }
+  .doc-cat-manage {
+    border-radius: 999px;
+  }
+  .doc-cat-tree {
+    list-style: none;
+    margin: 0;
+    padding: .55rem .55rem .7rem;
+    display: grid;
+    gap: .42rem;
+    position: relative;
+  }
+  .doc-cat-item {
+    position: relative;
+    margin-left: calc(var(--depth, 0) * 1rem);
+  }
+  .doc-cat-item::before {
+    content: "";
+    position: absolute;
+    left: calc(-.6rem);
+    top: -.45rem;
+    bottom: -.45rem;
+    width: 1px;
+    background: color-mix(in srgb, var(--bs-border-color) 70%, transparent);
+    opacity: calc(.2 + (var(--depth, 0) * .16));
+    display: none;
+  }
+  .doc-cat-item::after {
+    content: "";
+    position: absolute;
+    left: calc(-.6rem);
+    top: 50%;
+    width: .55rem;
+    border-top: 1px dashed color-mix(in srgb, var(--bs-border-color) 68%, transparent);
+    opacity: calc(.35 + (var(--depth, 0) * .14));
+    display: none;
+  }
+  .doc-cat-item.depth-1::before,
+  .doc-cat-item.depth-1::after,
+  .doc-cat-item.depth-2::before,
+  .doc-cat-item.depth-2::after,
+  .doc-cat-item.depth-3::before,
+  .doc-cat-item.depth-3::after,
+  .doc-cat-item.depth-4::before,
+  .doc-cat-item.depth-4::after,
+  .doc-cat-item.depth-5::before,
+  .doc-cat-item.depth-5::after { display: block; }
+
+  .doc-cat-link {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    text-decoration: none;
+    color: var(--bs-body-color);
+    border: 1px solid color-mix(in srgb, var(--bs-border-color) 75%, transparent);
+    border-radius: 999px;
+    padding: .42rem .72rem;
+    background: color-mix(in srgb, var(--bs-secondary-bg) 78%, transparent);
+    transition: transform .18s ease, box-shadow .2s ease, background-color .2s ease;
+  }
+  .doc-cat-link:hover {
+    transform: translateX(2px);
+    box-shadow: 0 8px 16px rgba(18, 26, 40, .08);
+  }
+  .doc-cat-link.is-active {
+    color: #0b1220;
+    border-color: transparent;
+    background: linear-gradient(90deg, rgba(74, 222, 128, .85), rgba(34, 197, 94, .7));
+    box-shadow: 0 10px 22px rgba(34, 197, 94, .25);
+    font-weight: 700;
+    position: relative;
+    outline: 2px solid rgba(34, 197, 94, .45);
+    outline-offset: 1px;
+  }
+  .doc-cat-link.is-active::before {
+    content: "";
+    width: .34rem;
+    align-self: stretch;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #16a34a, #22c55e);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .34) inset, 0 0 14px rgba(34, 197, 94, .45);
+    margin-right: .12rem;
+  }
+  .doc-cat-link.is-active::after {
+    content: "当前";
+    margin-left: auto;
+    font-size: .72rem;
+    font-weight: 700;
+    color: #14532d;
+    background: rgba(255, 255, 255, .68);
+    border: 1px solid rgba(22, 163, 74, .3);
+    border-radius: 999px;
+    padding: .1rem .45rem;
+    line-height: 1.2;
+  }
+  .doc-cat-link .branch {
+    color: var(--bs-secondary-color);
+    font-size: .9rem;
+    display: none;
+  }
+  .doc-level-badge {
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+    flex: 0 0 auto;
+    border: 1px solid color-mix(in srgb, var(--bs-border-color) 75%, transparent);
+    color: #12311d;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .7), rgba(255, 255, 255, .28));
+    box-shadow: 0 3px 8px rgba(10, 20, 30, .1);
+  }
+  .doc-cat-link.level-0 { background: linear-gradient(90deg, rgba(34, 197, 94, .14), rgba(22, 163, 74, .08)); }
+  .doc-cat-link.level-1 { background: linear-gradient(90deg, rgba(56, 189, 248, .15), rgba(14, 165, 233, .08)); }
+  .doc-cat-link.level-2 { background: linear-gradient(90deg, rgba(251, 191, 36, .16), rgba(245, 158, 11, .08)); }
+  .doc-cat-link.level-3,
+  .doc-cat-link.level-4,
+  .doc-cat-link.level-5 { background: linear-gradient(90deg, rgba(192, 132, 252, .14), rgba(168, 85, 247, .08)); }
+
+  [data-theme="dark"] .doc-cat-link {
+    color: #f4f8ff;
+    border-color: color-mix(in srgb, #c9dcff 42%, transparent);
+  }
+  [data-theme="dark"] .doc-cat-link .branch { color: #ccddff; }
+  [data-theme="dark"] .doc-cat-link.level-0 { background: linear-gradient(90deg, rgba(74, 222, 128, .34), rgba(34, 197, 94, .22)); }
+  [data-theme="dark"] .doc-cat-link.level-1 { background: linear-gradient(90deg, rgba(56, 189, 248, .34), rgba(14, 165, 233, .22)); }
+  [data-theme="dark"] .doc-cat-link.level-2 { background: linear-gradient(90deg, rgba(251, 191, 36, .36), rgba(245, 158, 11, .22)); }
+  [data-theme="dark"] .doc-cat-link.level-3,
+  [data-theme="dark"] .doc-cat-link.level-4,
+  [data-theme="dark"] .doc-cat-link.level-5 { background: linear-gradient(90deg, rgba(192, 132, 252, .34), rgba(168, 85, 247, .22)); }
+  [data-theme="dark"] .doc-cat-link.is-active {
+    color: #07111f;
+    background: linear-gradient(90deg, rgba(134, 239, 172, .95), rgba(74, 222, 128, .82));
+    outline-color: rgba(134, 239, 172, .65);
+    box-shadow: 0 12px 28px rgba(16, 185, 129, .35);
+  }
+  [data-theme="dark"] .doc-cat-link.is-active::before {
+    box-shadow: 0 0 0 1px rgba(240, 255, 246, .36) inset, 0 0 16px rgba(110, 231, 183, .5);
+  }
+  [data-theme="dark"] .doc-cat-link.is-active::after {
+    color: #04351f;
+    background: rgba(240, 255, 247, .82);
+    border-color: rgba(74, 222, 128, .42);
+  }
+  [data-theme="dark"] .doc-level-badge {
+    color: #ebf4ff;
+    border-color: color-mix(in srgb, #c9dcff 45%, transparent);
+    background: linear-gradient(180deg, rgba(176, 206, 255, .26), rgba(110, 146, 206, .2));
+    box-shadow: 0 4px 10px rgba(4, 12, 28, .42);
+  }
+  [data-theme="dark"] .doc-cat-item::before {
+    background: color-mix(in srgb, #bcd5ff 48%, transparent);
+  }
+  [data-theme="dark"] .doc-cat-item::after {
+    border-top-color: color-mix(in srgb, #bcd5ff 52%, transparent);
+  }
+</style>
 <div class="row g-3">
   <aside class="col-md-3">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="card doc-cat-card">
+      <div class="card-header d-flex justify-content-between align-items-center doc-cat-head">
         <span><i class="bi bi-folder"></i> 分类</span>
-        <a href="{{ url_for('categories.list_categories') }}" class="btn btn-sm btn-outline-primary">管理</a>
+        <a href="{{ url_for('categories.list_categories') }}" class="btn btn-sm btn-outline-primary doc-cat-manage">管理</a>
       </div>
-      <div class="list-group list-group-flush">
-        <a class="list-group-item list-group-item-action {% if not active_category %}active{% endif %}"
-           href="{{ url_for('documents.list_documents') }}">全部</a>
+      <ul class="doc-cat-tree">
+        <li class="doc-cat-item depth-0" style="--depth:0">
+          <a class="doc-cat-link level-0 {% if not active_category %}is-active{% endif %}"
+             href="{{ url_for('documents.list_documents') }}">全部</a>
+        </li>
         {% for c in categories %}
-        <a class="list-group-item list-group-item-action {% if active_category == c.id %}active{% endif %}"
-           style="padding-left: {{ 12 + c.depth * 18 }}px"
-           href="{{ url_for('documents.list_documents', category=c.id) }}">
-          {% if c.depth > 0 %}<span class="text-muted">└</span> {% endif %}{{ c.name }}
-        </a>
+        <li class="doc-cat-item depth-{{ c.depth if c.depth <= 5 else 5 }}" style="--depth:{{ c.depth if c.depth <= 5 else 5 }}">
+          <a class="doc-cat-link level-{{ c.depth if c.depth <= 5 else 5 }} {% if active_category == c.id %}is-active{% endif %}"
+             href="{{ url_for('documents.list_documents', category=c.id) }}">
+            {% if loop.index0 < categories|length - 1 and categories[loop.index0 + 1].depth > c.depth %}
+              <span class="doc-level-badge">L{{ c.depth + 1 }}</span>
+            {% endif %}
+            {% if c.depth > 0 %}<span class="branch">└</span>{% endif %}{{ c.name }}
+          </a>
+        </li>
         {% endfor %}
-      </div>
+      </ul>
     </div>
   </aside>
 

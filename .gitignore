@@ -17,6 +17,9 @@ output/
 
 # Tests / IDE
 .pytest_cache/
+.tmp_pytest/
+.tmp_pytest_base/
+.tmp_test_artifacts/
 .idea/
 .vscode/
 
