@@ -20,12 +20,14 @@ def index():
         Publisher.query.filter_by(user_id=uid).order_by(Publisher.name).all()
     )
     sources = Source.query.filter_by(user_id=uid).order_by(Source.name).all()
+    merge_audits = dict_cleanup.list_merge_audits(uid, limit=20)
     return render_template(
         "library/index.html",
         authors=authors,
         affiliations=affiliations,
         publishers=publishers,
         sources=sources,
+        merge_audits=merge_audits,
     )
 
 
@@ -107,6 +109,46 @@ def cleanup_apply():
         db.session.rollback()
         return jsonify(ok=False, error=str(e))
     return jsonify(ok=True, deleted=counts)
+
+
+@bp.route("/merge_preview")
+@login_required
+def merge_preview():
+    data = dict_cleanup.merge_preview(current_user.id)
+    return jsonify(ok=True, **data)
+
+
+@bp.route("/merge_apply", methods=["POST"])
+@login_required
+def merge_apply():
+    try:
+        result = dict_cleanup.merge_apply(current_user.id)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(ok=False, error=str(e))
+    return jsonify(result)
+
+
+@bp.route("/merge_rollback", methods=["POST"])
+@login_required
+def merge_rollback():
+    payload = request.get_json(silent=True) or {}
+    audit_id = payload.get("audit_id")
+    try:
+        if audit_id is None:
+            result = dict_cleanup.merge_rollback_last(current_user.id)
+        else:
+            result = dict_cleanup.merge_rollback_by_audit_id(current_user.id, int(audit_id))
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(ok=False, error=str(e))
+    return jsonify(result)
+
+
+@bp.route("/merge_audits")
+@login_required
+def merge_audits():
+    return jsonify(ok=True, items=dict_cleanup.list_merge_audits(current_user.id, limit=50))
 
 
 # ---- JSON autocomplete endpoints ----
