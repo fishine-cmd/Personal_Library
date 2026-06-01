@@ -22,8 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let mode = "idle";
   let idleTimer = 0;
   let saveTimer = 0;
+  let saveSeq = 0;
   let lastInteractionReport = 0;
   let isGenerating = false;
+  let isScaling = false;
 
   const shell = document.createElement("div");
   shell.className = "ai-agent-shell is-hidden";
@@ -38,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <span class="ai-agent-label"></span>
     </button>
     <div class="ai-agent-menu" hidden>
-      <div class="ai-agent-menu__title">AI Agent</div>
+      <div class="ai-agent-menu__title">助手喵~</div>
       <div class="ai-agent-menu__row">
         <label class="form-label ai-agent-menu__mini mb-1" for="ai-agent-name">名字</label>
         <div class="input-group input-group-sm">
@@ -88,9 +90,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function applyState(next) {
     Object.assign(state, next || {});
+    const baseSize = 200;
     const scale = clamp(Number(state.scale) || 1, 0.5, 1.6);
-    const x = clamp(Number(state.position_x) || 24, 0, Math.max(0, window.innerWidth - 48));
-    const y = clamp(Number(state.position_y) || 24, 0, Math.max(0, window.innerHeight - 48));
+    const visualSize = Math.round(baseSize * scale);
+    const x = clamp(Number(state.position_x) || 24, 0, Math.max(0, window.innerWidth - visualSize));
+    const y = clamp(Number(state.position_y) || 24, 0, Math.max(0, window.innerHeight - visualSize));
     state.scale = scale;
     state.position_x = x;
     state.position_y = y;
@@ -98,7 +102,8 @@ document.addEventListener("DOMContentLoaded", () => {
     shell.classList.toggle("is-hidden", !state.enabled);
     reopen.classList.toggle("is-hidden", !!state.enabled);
     shell.classList.toggle("is-facing-left", state.facing === "left");
-    shell.style.setProperty("--ai-agent-scale", String(scale));
+    shell.style.width = `${visualSize}px`;
+    shell.style.height = `${visualSize}px`;
     shell.style.left = `${x}px`;
     shell.style.bottom = `${y}px`;
     label.textContent = state.agent_name || "小咪";
@@ -125,8 +130,10 @@ document.addEventListener("DOMContentLoaded", () => {
     applyState(state);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
+      const seq = ++saveSeq;
       try {
         const data = await postJson(cfg.stateUrl, patch);
+        if (seq !== saveSeq) return;
         if (data.state) applyState(data.state);
       } catch (err) {
         showOutput(`保存失败：${err.message}`);
@@ -141,6 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function bumpJournaling(source) {
+    if (isScaling) return;
     if (!state.enabled || shell.classList.contains("is-hidden")) return;
     setMode("journaling");
     clearTimeout(idleTimer);
@@ -252,6 +260,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   scaleInput.addEventListener("input", () => {
+    isScaling = true;
+    Object.assign(state, {scale: Number(scaleInput.value)});
+    applyState(state);
+  });
+
+  scaleInput.addEventListener("change", () => {
+    isScaling = false;
     saveState({scale: Number(scaleInput.value)});
   });
 

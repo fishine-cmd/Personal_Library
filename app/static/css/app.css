@@ -370,7 +370,7 @@ body.is-page-transitioning * {
   input[type="button"],
   input[type="reset"],
   a[href]
-):not(:disabled):not(.disabled):hover {
+):not(:disabled):not(.disabled):not(.ai-agent-avatar):hover {
   box-shadow: var(--interactive-shadow);
 }
 
@@ -386,7 +386,7 @@ body.is-page-transitioning * {
   input[type="submit"],
   input[type="button"],
   input[type="reset"]
-):not(:disabled):not(.disabled):hover {
+):not(:disabled):not(.disabled):not(.ai-agent-avatar):hover {
   transform: translateY(-1px);
 }
 
@@ -399,7 +399,7 @@ body.is-page-transitioning * {
   input[type="submit"],
   input[type="button"],
   input[type="reset"]
-):not(:disabled):not(.disabled):active {
+):not(:disabled):not(.disabled):not(.ai-agent-avatar):active {
   transform: translateY(1px) scale(0.995);
   box-shadow: none;
 }
@@ -523,11 +523,9 @@ a:hover {
   bottom: 24px;
   width: 200px;
   height: 200px;
-  --ai-agent-scale: 1;
   --ai-agent-name-bg: rgba(16, 16, 16, 0.82);
   --ai-agent-name-fg: #f4f6ee;
-  transform-origin: left bottom;
-  transform: translate3d(0, 0, 0) scale(var(--ai-agent-scale));
+  overflow: visible;
   pointer-events: auto;
   user-select: none;
   touch-action: none;
@@ -575,8 +573,8 @@ a:hover {
 
 .ai-agent-avatar {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: 100%;
+  height: 100%;
   border: 0;
   padding: 0;
   background: transparent;
@@ -586,6 +584,12 @@ a:hover {
 
 .ai-agent-avatar:active {
   cursor: grabbing;
+}
+
+.ai-agent-avatar:hover,
+.ai-agent-avatar:focus-visible,
+.ai-agent-avatar:active {
+  box-shadow: none !important;
 }
 
 .ai-agent-avatar img {
@@ -677,7 +681,6 @@ a:hover {
   .ai-agent-shell {
     left: 12px;
     bottom: 12px;
-    transform-origin: left bottom;
   }
 
   .ai-agent-menu {
