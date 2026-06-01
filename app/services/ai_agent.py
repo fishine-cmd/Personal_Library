@@ -50,6 +50,11 @@ def get_or_create_setting(user_id: int, commit: bool = True) -> AIAgentSetting:
             db.session.commit()
         else:
             db.session.flush()
+    elif setting.migrate_api_key_to_encrypted():
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
     return setting
 
 
