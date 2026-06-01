@@ -44,14 +44,15 @@ def test_ai_agent_state_update_is_user_scoped(client):
         "/ai-agent/api/state",
         json={
             "agent_name": "Alpha",
-            "scale": 1.35,
             "facing": "left",
             "position_x": 120,
             "position_y": 80,
         },
     )
     assert resp.status_code == 200
-    assert resp.get_json()["state"]["agent_name"] == "Alpha"
+    state = resp.get_json()["state"]
+    assert state["agent_name"] == "Alpha"
+    assert "scale" not in state
 
     client.get("/auth/logout")
     client.post(
@@ -61,6 +62,18 @@ def test_ai_agent_state_update_is_user_scoped(client):
     resp = client.get("/ai-agent/api/state")
     assert resp.status_code == 200
     assert resp.get_json()["state"]["agent_name"] != "Alpha"
+
+
+def test_ai_agent_state_ignores_legacy_scale_payload(login_client):
+    resp = login_client.post(
+        "/ai-agent/api/state",
+        json={"scale": 1.35, "position_x": 120, "position_y": 80},
+    )
+    assert resp.status_code == 200
+    state = resp.get_json()["state"]
+    assert state["position_x"] == 120
+    assert state["position_y"] == 80
+    assert "scale" not in state
 
 
 def test_settings_save_ai_agent_config_without_key_echo(login_client, app):

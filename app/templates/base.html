@@ -41,7 +41,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('bibtex.import_form') }}">BibTeX</a></li>
         <li class="nav-item"><a class="nav-link" href="{{ url_for('journals.index') }}">日志</a></li>
       </ul>
-      <ul class="navbar-nav align-items-center">
+      <ul class="navbar-nav align-items-center navbar-user-actions">
         <li class="nav-item me-2">
           <button class="theme-toggle" id="theme-toggle" type="button" title="切换主题" aria-label="切换主题">
             <i class="bi bi-moon-fill" data-theme-icon="light"></i>
@@ -53,7 +53,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">退出</a></li>
       </ul>
       {% else %}
-      <ul class="navbar-nav ms-auto align-items-center">
+      <ul class="navbar-nav ms-auto align-items-center navbar-user-actions navbar-user-actions--guest">
         <li class="nav-item me-2">
           <button class="theme-toggle" id="theme-toggle" type="button" title="切换主题" aria-label="切换主题">
             <i class="bi bi-moon-fill" data-theme-icon="light"></i>
