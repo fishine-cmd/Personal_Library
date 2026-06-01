@@ -316,7 +316,6 @@ class AIAgentSetting(db.Model):
     )
     agent_name = db.Column(db.String(64), nullable=False, default="小咪")
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    scale = db.Column(db.Float, nullable=False, default=1.0)
     facing = db.Column(db.String(8), nullable=False, default="right")
     position_x = db.Column(db.Integer, nullable=False, default=24)
     position_y = db.Column(db.Integer, nullable=False, default=24)

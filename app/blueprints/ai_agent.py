@@ -15,14 +15,6 @@ from ..services.ai_agent import (
 bp = Blueprint("ai_agent", __name__)
 
 
-def _clamp_float(value, low: float, high: float, default: float) -> float:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return default
-    return min(max(number, low), high)
-
-
 def _clamp_int(value, low: int, high: int, default: int) -> int:
     try:
         number = int(round(float(value)))
@@ -44,8 +36,6 @@ def api_state():
         setting.agent_name = name[:64] or setting.agent_name or "小咪"
     if "enabled" in payload:
         setting.enabled = bool(payload.get("enabled"))
-    if "scale" in payload:
-        setting.scale = _clamp_float(payload.get("scale"), 0.5, 1.6, setting.scale or 1.0)
     if "facing" in payload:
         setting.facing = "left" if payload.get("facing") == "left" else "right"
     if "position_x" in payload:

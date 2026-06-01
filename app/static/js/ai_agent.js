@@ -11,27 +11,31 @@ document.addEventListener("DOMContentLoaded", () => {
     journalingSrc: root.dataset.journalingSrc,
   };
 
+  const AVATAR_SIZE = 200;
   const state = {
     agent_name: "小咪",
     enabled: true,
-    scale: 1,
     facing: "right",
     position_x: 24,
     position_y: 24,
   };
+
   let mode = "idle";
   let idleTimer = 0;
   let saveTimer = 0;
+  let saveSeq = 0;
   let lastInteractionReport = 0;
   let isGenerating = false;
 
   const shell = document.createElement("div");
   shell.className = "ai-agent-shell is-hidden";
+
   const reopen = document.createElement("button");
   reopen.className = "ai-agent-reopen is-hidden";
   reopen.type = "button";
   reopen.setAttribute("aria-label", "显示 AI Agent");
   reopen.innerHTML = `<i class="bi bi-stars"></i><span>猫娘</span>`;
+
   shell.innerHTML = `
     <button class="ai-agent-avatar" type="button" aria-label="AI Agent">
       <img class="ai-agent-image" alt="" draggable="false">
@@ -48,10 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
           </button>
         </div>
       </div>
-      <div class="ai-agent-menu__row">
-        <label class="form-label ai-agent-menu__mini mb-1" for="ai-agent-scale">缩放</label>
-        <input id="ai-agent-scale" class="form-range" type="range" min="0.5" max="1.6" step="0.05">
-      </div>
       <div class="ai-agent-menu__row d-flex flex-wrap gap-2">
         <button class="btn btn-sm btn-outline-secondary" type="button" data-agent-action="face">
           <i class="bi bi-arrow-left-right"></i> 转向
@@ -65,12 +65,13 @@ document.addEventListener("DOMContentLoaded", () => {
           <i class="bi bi-journal-text"></i> 日志
         </button>
         <button class="btn btn-sm btn-outline-primary" type="button" data-agent-journal="week">
-          <i class="bi bi-calendar-week"></i> 周札
+          <i class="bi bi-calendar-week"></i> 周报
         </button>
       </div>
       <div class="ai-agent-menu__row ai-agent-menu__output" data-agent-output hidden></div>
     </div>
   `;
+
   root.appendChild(shell);
   root.appendChild(reopen);
 
@@ -79,7 +80,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const label = shell.querySelector(".ai-agent-label");
   const menu = shell.querySelector(".ai-agent-menu");
   const nameInput = shell.querySelector("#ai-agent-name");
-  const scaleInput = shell.querySelector("#ai-agent-scale");
   const output = shell.querySelector("[data-agent-output]");
 
   function clamp(value, low, high) {
@@ -87,24 +87,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function applyState(next) {
-    Object.assign(state, next || {});
-    const scale = clamp(Number(state.scale) || 1, 0.5, 1.6);
-    const x = clamp(Number(state.position_x) || 24, 0, Math.max(0, window.innerWidth - 48));
-    const y = clamp(Number(state.position_y) || 24, 0, Math.max(0, window.innerHeight - 48));
-    state.scale = scale;
+    const sanitized = {...next};
+    delete sanitized.scale;
+    Object.assign(state, sanitized);
+
+    const x = clamp(
+      Number(state.position_x) || 24,
+      0,
+      Math.max(0, window.innerWidth - AVATAR_SIZE),
+    );
+    const y = clamp(
+      Number(state.position_y) || 24,
+      0,
+      Math.max(0, window.innerHeight - AVATAR_SIZE),
+    );
+
     state.position_x = x;
     state.position_y = y;
 
     shell.classList.toggle("is-hidden", !state.enabled);
     reopen.classList.toggle("is-hidden", !!state.enabled);
     shell.classList.toggle("is-facing-left", state.facing === "left");
-    shell.style.setProperty("--ai-agent-scale", String(scale));
+    shell.style.width = `${AVATAR_SIZE}px`;
+    shell.style.height = `${AVATAR_SIZE}px`;
     shell.style.left = `${x}px`;
     shell.style.bottom = `${y}px`;
     label.textContent = state.agent_name || "小咪";
     nameInput.value = state.agent_name || "小咪";
-    scaleInput.value = String(scale);
-    image.src = mode === "journaling" ? cfg.journalingSrc : cfg.idleSrc;
   }
 
   async function postJson(url, payload) {
@@ -121,13 +130,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function saveState(patch) {
-    Object.assign(state, patch);
+    const nextPatch = {...patch};
+    delete nextPatch.scale;
+    Object.assign(state, nextPatch);
     applyState(state);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
+      const seq = ++saveSeq;
       try {
-        const data = await postJson(cfg.stateUrl, patch);
-        if (data.state) applyState(data.state);
+        const data = await postJson(cfg.stateUrl, nextPatch);
+        if (seq !== saveSeq) return;
+        if (!data.state) return;
+        applyState(data.state);
       } catch (err) {
         showOutput(`保存失败：${err.message}`);
       }
@@ -170,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function generateJournal(period) {
     const url = period === "week" ? cfg.journalWeekUrl : cfg.journalTodayUrl;
-    const labelText = period === "week" ? "正在生成周札..." : "正在生成日志...";
+    const labelText = period === "week" ? "正在生成周报..." : "正在生成日志...";
     isGenerating = true;
     setMode("journaling");
     showOutput(labelText);
@@ -211,8 +225,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (dx + dy > 4) drag.moved = true;
     if (!drag.moved) return;
 
-    const x = clamp(event.clientX - drag.offsetX, 0, Math.max(0, window.innerWidth - drag.width));
-    const y = clamp(window.innerHeight - event.clientY - drag.offsetBottom, 0, Math.max(0, window.innerHeight - drag.height));
+    const x = clamp(
+      event.clientX - drag.offsetX,
+      0,
+      Math.max(0, window.innerWidth - drag.width),
+    );
+    const y = clamp(
+      window.innerHeight - event.clientY - drag.offsetBottom,
+      0,
+      Math.max(0, window.innerHeight - drag.height),
+    );
     state.position_x = Math.round(x);
     state.position_y = Math.round(y);
     applyState(state);
@@ -251,10 +273,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  scaleInput.addEventListener("input", () => {
-    saveState({scale: Number(scaleInput.value)});
-  });
-
   document.addEventListener("pointerdown", event => {
     bumpJournaling(event.target.closest("#ai-agent-root") ? "agent" : "mouse");
   }, true);
@@ -284,6 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .then(data => {
       if (data && data.state) {
         applyState(data.state);
+        setMode(mode);
         reportActivity("page_view", document.title || location.pathname, {
           path: location.pathname,
           query: location.search,
