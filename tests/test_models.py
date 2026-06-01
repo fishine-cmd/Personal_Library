@@ -3,7 +3,7 @@ import pytest
 from app.extensions import db
 from app.models import (
     User, Author, Keyword, Affiliation, Source, Publisher,
-    Document, DocumentAuthor, Category,
+    Document, DocumentAuthor, Category, Tag,
 )
 from app.services import upsert
 from app.services.bibtex_io import import_bibtex, export_bibtex
@@ -71,6 +71,31 @@ def test_upsert_source_reuses_existing(app, user):
         s1 = upsert.get_or_create_source("ICML", user, "conference")
         s2 = upsert.get_or_create_source("ICML", user, "conference")
         assert s1.id == s2.id
+
+
+def test_upsert_tag_scoped_by_user(app):
+    with app.app_context():
+        u1 = User(username="tag_u1")
+        u1.set_password("pw123456")
+        u2 = User(username="tag_u2")
+        u2.set_password("pw123456")
+        db.session.add_all([u1, u2])
+        db.session.flush()
+
+        t1 = upsert.get_or_create_tag("化学", u1.id)
+        t2 = upsert.get_or_create_tag("化学", u1.id)
+        t3 = upsert.get_or_create_tag("化学", u2.id)
+
+        doc = Document(user_id=u1.id, title="Tagged Paper")
+        db.session.add(doc)
+        db.session.flush()
+        doc.tags.append(t1)
+        db.session.commit()
+
+        assert t1.id == t2.id
+        assert t1.id != t3.id
+        assert Tag.query.filter_by(name="化学").count() == 2
+        assert [t.name for t in db.session.get(Document, doc.id).tags] == ["化学"]
 
 
 def test_bibtex_roundtrip(app, user):

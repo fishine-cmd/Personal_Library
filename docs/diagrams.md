@@ -11,7 +11,7 @@
 
 ## 一、E-R 图（实体关系图）
 
-数据库共 **14 张表**，严格满足第三范式（3NF）。下图覆盖全部实体、属性和关系。
+数据库共 **16 张表**，严格满足第三范式（3NF）。下图覆盖全部实体、属性和关系。
 
 - 关系基数符号：`||` 一，`o{` 多
 - `PK` = 主键，`FK` = 外键，`UK` = 唯一键（含联合唯一键）
@@ -23,6 +23,7 @@ erDiagram
     USERS                ||--o{ AUTHORS            : "拥有(per-user 字典)"
     USERS                ||--o{ AFFILIATIONS       : "拥有(per-user 字典)"
     USERS                ||--o{ KEYWORDS           : "拥有(per-user 字典)"
+    USERS                ||--o{ TAGS               : "拥有(per-user 标签)"
     USERS                ||--o{ PUBLISHERS         : "拥有(per-user 字典)"
     USERS                ||--o{ SOURCES            : "拥有(per-user 字典)"
     USERS                ||--o{ AUTHOR_CODES       : "同名计数器"
@@ -35,6 +36,8 @@ erDiagram
     AUTHORS              ||--o{ DOCUMENT_AUTHORS   : ""
     DOCUMENTS            ||--o{ DOCUMENT_KEYWORDS  : ""
     KEYWORDS             ||--o{ DOCUMENT_KEYWORDS  : ""
+    DOCUMENTS            ||--o{ DOCUMENT_TAGS      : ""
+    TAGS                 ||--o{ DOCUMENT_TAGS      : ""
     AUTHORS              ||--o{ AUTHOR_AFFILIATIONS: ""
     AFFILIATIONS         ||--o{ AUTHOR_AFFILIATIONS: ""
     DOCUMENTS            ||--o{ FILES              : "附件"
@@ -103,6 +106,12 @@ erDiagram
         varchar name
     }
 
+    TAGS {
+        int     id      PK
+        int     user_id FK "UK(user_id,name)"
+        varchar name
+    }
+
     DOCUMENTS {
         int      id               PK
         int      user_id          FK
@@ -134,6 +143,11 @@ erDiagram
         int keyword_id  PK_FK
     }
 
+    DOCUMENT_TAGS {
+        int document_id PK_FK
+        int tag_id      PK_FK
+    }
+
     USER_SETTINGS {
         int     user_id    PK_FK
         varchar mineru_url "PDF 解析服务地址"
@@ -154,13 +168,13 @@ erDiagram
 
 | 范式 | 怎么落地 |
 |---|---|
-| 1NF | 所有列原子化；作者/关键词/单位都拆到独立表，不存逗号分隔字符串 |
+| 1NF | 所有列原子化；作者/关键词/标签/单位都拆到独立表，不存逗号分隔字符串 |
 | 2NF | 联合主键的中间表（如 `document_authors`）的非主键属性 `author_order` 完全依赖于整个联合主键 |
 | 3NF | 比如出版社不直接放在文献表，而是 `documents → sources → publishers` 链式依赖；单位通过 `author_affiliations` 间接关联作者，消除传递依赖 |
 
 ### 关于 per-user 字典与同名作者编号
 
-- **字典表均带 `user_id`**：`authors / affiliations / publishers / sources / keywords` 都按用户隔离，不会出现 A 用户改名波及 B 用户的情况；唯一约束都升级为联合 `(user_id, name [, type/code])`。
+- **字典表和标签均带 `user_id`**：`authors / affiliations / publishers / sources / keywords / tags` 都按用户隔离，不会出现 A 用户改名波及 B 用户的情况；唯一约束都升级为联合 `(user_id, name [, type/code])`。
 - **同名作者编号**：`authors` 增加 `code` 列，配合 `author_codes(user_id, name) → next_code` 计数器，让同一个用户库里多位"张三"以 `张三#1`、`张三#2` 等区分。表单录入走严格模式（同名必须显式选择 `#N` 或标记为新人）；BibTeX 批量导入走宽松模式（复用最低 `code`）。
 
 ---
@@ -203,7 +217,7 @@ flowchart TB
     subgraph SYS["个人文献管理系统"]
         P1(("1.0<br/>用户认证"))
         P2(("2.0<br/>文献 CRUD"))
-        P3(("3.0<br/>检索查询"))
+        P3(("3.0<br/>检索查询<br/>(基础 + 高级字段)"))
         P4(("4.0<br/>分类管理"))
         P5(("5.0<br/>字典维护<br/>(Upsert + 清理)"))
         P6(("6.0<br/>BibTeX<br/>导入/导出"))
@@ -215,7 +229,7 @@ flowchart TB
     D1[("D1<br/>users")]
     D2[("D2<br/>documents<br/>+ 关联表")]
     D3[("D3<br/>categories")]
-    D4[("D4 字典表<br/>authors / keywords<br/>publishers / sources<br/>affiliations / author_codes<br/>(全部 per-user)")]
+    D4[("D4 字典表与标签<br/>authors / keywords / tags<br/>publishers / sources<br/>affiliations / author_codes<br/>(全部 per-user)")]
     D5[("D5<br/>uploads/ 文件系统")]
     D6[("D6<br/>user_settings")]
 
@@ -223,17 +237,17 @@ flowchart TB
     P1 -- "会话 Cookie" --> User
     P1 <-- "读 / 写账号" --> D1
 
-    User -- "文献表单 (含作者/关键词)" --> P2
+    User -- "文献表单 (含作者/关键词/标签)" --> P2
     P2 -- "文献详情页" --> User
     P2 <-- "INSERT / UPDATE / DELETE" --> D2
     P2 -- "标准化实体" --> P5
     P5 <-- "SELECT / INSERT / DELETE" --> D4
     P2 -- "category_id" --> D3
 
-    User -- "搜索条件 q / 分类 / 类型 / 年份" --> P3
+    User -- "搜索条件 q / 分类 / 类型 / 年份范围 / 作者 / 来源 / 关键词 / 标签" --> P3
     P3 -- "结果列表" --> User
     P3 -- "JOIN 查询" --> D2
-    P3 -- "匹配作者/关键词" --> D4
+    P3 -- "匹配作者/关键词/标签/来源" --> D4
 
     User -- "新建/重命名/删除分类" --> P4
     P4 -- "分类树视图" --> User
@@ -266,8 +280,8 @@ flowchart TB
 
 | 编号 | 来源 → 去向 | 数据内容 |
 |---|---|---|
-| 1 | 用户 → 2.0 | 标题、摘要、作者文本、关键词、年份、来源、附件等 |
-| 2 | 2.0 → 5.0 | 待 upsert 的作者名（含编号 `#N` 或 `new`）/ 单位 / 关键词 / 期刊 / 出版社 |
+| 1 | 用户 → 2.0 | 标题、摘要、作者文本、关键词、标签、年份、来源、附件等 |
+| 2 | 2.0 → 5.0 | 待 upsert 的作者名（含编号 `#N` 或 `new`）/ 单位 / 关键词 / 标签 / 期刊 / 出版社 |
 | 3 | 5.0 → D4 | "查或建" 标准化实体（在 `user_id` 内唯一） |
 | 4 | 2.0 → D2 | 新增 / 更新 / 删除文献主记录及关联表 |
 | 5 | 3.0 → 用户 | 经多表 JOIN 后聚合的文献结果列表 |
@@ -281,7 +295,7 @@ flowchart TB
 
 ## 三、用例 → 数据存储 矩阵（辅助视图）
 
-| 用例 / 数据存储     | D1 users | D2 documents | D3 categories | D4 字典 | D5 文件 | D6 设置 |
+| 用例 / 数据存储     | D1 users | D2 documents | D3 categories | D4 字典/标签 | D5 文件 | D6 设置 |
 |---|---|---|---|---|---|---|
 | 注册 / 登录         | C / R    |              |               |          |          |          |
 | 新建文献            |          | C            | R             | C / R    | C        |          |

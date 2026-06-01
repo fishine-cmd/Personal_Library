@@ -109,6 +109,12 @@
   </div>
 
   <div class="col-12">
+    <label class="form-label">标签（自定义 tag，逗号或分号分隔）</label>
+    <input class="form-control" name="tags_raw" value="{{ doc.tags_display if doc else '' }}"
+           placeholder="化学, 高分子">
+  </div>
+
+  <div class="col-12">
     <label class="form-label">摘要</label>
     <textarea class="form-control" name="abstract" rows="4">{{ doc.abstract if doc else '' }}</textarea>
   </div>

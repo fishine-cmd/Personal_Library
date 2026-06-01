@@ -46,11 +46,13 @@
   {% endif %}
 {% endmacro %}
 
-{% set total_entries = authors|length + affiliations|length + sources|length + publishers|length %}
+{% set total_entries = authors|length + affiliations|length + sources|length + publishers|length + keywords|length + tags|length %}
 {% set empty_types = (1 if authors|length == 0 else 0)
   + (1 if affiliations|length == 0 else 0)
   + (1 if sources|length == 0 else 0)
-  + (1 if publishers|length == 0 else 0) %}
+  + (1 if publishers|length == 0 else 0)
+  + (1 if keywords|length == 0 else 0)
+  + (1 if tags|length == 0 else 0) %}
 
 {% block content %}
 <style>
@@ -159,7 +161,7 @@
       <div class="t">总词条数</div>
     </div>
     <div class="gov-kpi">
-      <div class="n">{{ 4 - empty_types }}</div>
+      <div class="n">{{ 6 - empty_types }}</div>
       <div class="t">已启用字典类型</div>
     </div>
     <div class="gov-kpi">
@@ -300,6 +302,24 @@
       </div>
     {% endcall %}
   </div>
+
+  <div class="col-md-6">
+    {% call(item) dict_card('关键词', keywords, 'library.delete_keyword', 'kw_id', '重复风险：待检测', '空') %}
+      <div class="dict-meta">
+        {{ item.name }}
+        <div class="small text-muted">{{ item.documents|length }} 篇文献</div>
+      </div>
+    {% endcall %}
+  </div>
+
+  <div class="col-md-6">
+    {% call(item) dict_card('标签', tags, 'library.delete_tag', 'tag_id', '重复风险：待检测', '空') %}
+      <div class="dict-meta">
+        <a href="{{ url_for('documents.list_documents', tag=item.name) }}">{{ item.name }}</a>
+        <div class="small text-muted">{{ item.documents|length }} 篇文献</div>
+      </div>
+    {% endcall %}
+  </div>
 </div>
 
 <script>
@@ -309,6 +329,7 @@ const CLEANUP_SECTIONS = [
   ['出版社', 'publishers'],
   ['期刊 / 会议', 'sources'],
   ['关键词', 'keywords'],
+  ['标签', 'tags'],
 ];
 
 const cleanupModal = document.getElementById('cleanupModal');

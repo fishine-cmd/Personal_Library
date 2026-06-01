@@ -1,6 +1,6 @@
 """Detect and remove unused dictionary entries.
 
-Dictionary tables (authors / affiliations / publishers / sources / keywords)
+Dictionary tables (authors / affiliations / publishers / sources / keywords / tags)
 are shared globally across users. Records not referenced by any document or
 author are dead weight and can be safely removed.
 
@@ -28,6 +28,7 @@ from ..models import (
     MergeAudit,
     Publisher,
     Source,
+    Tag,
 )
 
 _WS = re.compile(r"\s+")
@@ -56,6 +57,13 @@ def find_orphan_keywords(user_id: int) -> list[Keyword]:
     return Keyword.query.filter_by(user_id=user_id).filter(~Keyword.documents.any()).all()
 
 
+def find_orphan_tags(user_id: int) -> list[Tag]:
+    return (
+        Tag.query.filter_by(user_id=user_id)
+        .filter(~Tag.documents.any()).all()
+    )
+
+
 def scan_orphans(user_id: int) -> dict[str, list]:
     return {
         "authors": find_orphan_authors(user_id),
@@ -63,6 +71,7 @@ def scan_orphans(user_id: int) -> dict[str, list]:
         "publishers": find_orphan_publishers(user_id),
         "sources": find_orphan_sources(user_id),
         "keywords": find_orphan_keywords(user_id),
+        "tags": find_orphan_tags(user_id),
     }
 
 
@@ -82,7 +91,8 @@ def delete_all_orphans(user_id: int) -> dict[str, int]:
         ("publishers", find_orphan_publishers, True),
         ("authors", find_orphan_authors, True),
         ("affiliations", find_orphan_affiliations, True),
-        ("keywords", find_orphan_keywords, False),
+        ("keywords", find_orphan_keywords, True),
+        ("tags", find_orphan_tags, False),
     )
 
     for key, finder, should_flush in ordered_steps:
@@ -99,11 +109,13 @@ def delete_all_orphans(user_id: int) -> dict[str, int]:
 def prune_orphans_around_document(
     authors: Iterable[Author],
     keywords: Iterable[Keyword],
+    tags: Iterable[Tag],
     source: Optional[Source],
 ) -> dict[str, int]:
     """Delete now-unreferenced entities related to a just-deleted document."""
     counts = {
         "keywords": 0,
+        "tags": 0,
         "authors": 0,
         "affiliations": 0,
         "sources": 0,
@@ -115,6 +127,11 @@ def prune_orphans_around_document(
         if not kw.documents:
             db.session.delete(kw)
             counts["keywords"] += 1
+
+    for tag in tags:
+        if not tag.documents:
+            db.session.delete(tag)
+            counts["tags"] += 1
 
     affs_to_check: set[Affiliation] = set()
     user_names_to_check: set[tuple[int, str]] = set()
@@ -181,6 +198,7 @@ def find_potential_duplicates(user_id: int) -> dict[str, list[list]]:
         "publishers": _group_by_normalized_name(_load_user_rows(Publisher, user_id)),
         "sources": _group_by_normalized_name(_load_user_rows(Source, user_id)),
         "keywords": _group_by_normalized_name(_load_user_rows(Keyword, user_id)),
+        "tags": _group_by_normalized_name(_load_user_rows(Tag, user_id)),
     }
 
 

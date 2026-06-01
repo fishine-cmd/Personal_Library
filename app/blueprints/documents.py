@@ -26,6 +26,8 @@ from ..models import (
     Author,
     AuthorCode,
     Keyword,
+    Source,
+    Tag,
     File,
     UserSetting,
 )
@@ -166,6 +168,20 @@ def _persist_document_form(document: Document, form, files):
     for kw_name in deduped:
         document.keywords.append(upsert.get_or_create_keyword(kw_name, uid))
 
+    # tags
+    document.tags.clear()
+    raw_tags = upsert.parse_csv_list(form.get("tags_raw", ""))
+    seen, deduped = set(), []
+    for tag_name in raw_tags:
+        if tag_name in seen:
+            continue
+        seen.add(tag_name)
+        deduped.append(tag_name)
+    if len(deduped) < len(raw_tags):
+        flash(f"已自动去除 {len(raw_tags) - len(deduped)} 个重复标签", "info")
+    for tag_name in deduped:
+        document.tags.append(upsert.get_or_create_tag(tag_name, uid))
+
 
 @bp.route("/")
 @login_required
@@ -174,6 +190,14 @@ def list_documents():
     category_id = request.args.get("category", type=int)
     doc_type = request.args.get("type")
     year = request.args.get("year", type=int)
+    year_from = request.args.get("year_from", type=int)
+    year_to = request.args.get("year_to", type=int)
+    title = (request.args.get("title") or "").strip()
+    abstract = (request.args.get("abstract") or "").strip()
+    author = (request.args.get("author") or "").strip()
+    source = (request.args.get("source") or "").strip()
+    keyword = (request.args.get("keyword") or "").strip()
+    tag = (request.args.get("tag") or "").strip()
 
     query = Document.query.filter_by(user_id=current_user.id)
 
@@ -184,23 +208,43 @@ def list_documents():
         query = query.filter_by(document_type=doc_type)
     if year:
         query = query.filter_by(publication_year=year)
+    if year_from:
+        query = query.filter(Document.publication_year >= year_from)
+    if year_to:
+        query = query.filter(Document.publication_year <= year_to)
+
+    if title:
+        query = query.filter(Document.title.ilike(f"%{title}%"))
+    if abstract:
+        query = query.filter(Document.abstract.ilike(f"%{abstract}%"))
+    if author:
+        like = f"%{author}%"
+        query = query.filter(
+            Document.author_links.any(
+                DocumentAuthor.author.has(Author.name.ilike(like))
+            )
+        )
+    if source:
+        query = query.filter(Document.source.has(Source.name.ilike(f"%{source}%")))
+    if keyword:
+        query = query.filter(Document.keywords.any(Keyword.name.ilike(f"%{keyword}%")))
+    if tag:
+        query = query.filter(Document.tags.any(Tag.name.ilike(f"%{tag}%")))
 
     if q:
         like = f"%{q}%"
-        query = (
-            query.outerjoin(DocumentAuthor, DocumentAuthor.document_id == Document.id)
-            .outerjoin(Author, Author.id == DocumentAuthor.author_id)
-            .outerjoin(Document.keywords)
-            .filter(
-                or_(
-                    Document.title.ilike(like),
-                    Document.abstract.ilike(like),
-                    Document.doi.ilike(like),
-                    Author.name.ilike(like),
-                    Keyword.name.ilike(like),
-                )
+        query = query.filter(
+            or_(
+                Document.title.ilike(like),
+                Document.abstract.ilike(like),
+                Document.doi.ilike(like),
+                Document.author_links.any(
+                    DocumentAuthor.author.has(Author.name.ilike(like))
+                ),
+                Document.keywords.any(Keyword.name.ilike(like)),
+                Document.tags.any(Tag.name.ilike(like)),
+                Document.source.has(Source.name.ilike(like)),
             )
-            .distinct()
         )
 
     documents = query.order_by(Document.updated_at.desc()).all()
@@ -220,6 +264,14 @@ def list_documents():
         active_category_name=active_category_name,
         active_type=doc_type,
         active_year=year,
+        active_year_from=year_from,
+        active_year_to=year_to,
+        title=title,
+        abstract=abstract,
+        author=author,
+        source=source,
+        keyword=keyword,
+        tag=tag,
     )
 
 
@@ -448,6 +500,7 @@ def delete(doc_id):
 
     related_authors = {link.author for link in doc.author_links}
     related_keywords = set(doc.keywords)
+    related_tags = set(doc.tags)
     related_source = doc.source
 
     upload_root = Path(current_app.config["UPLOAD_FOLDER"])
@@ -460,7 +513,7 @@ def delete(doc_id):
     db.session.flush()
 
     cleaned = dict_cleanup.prune_orphans_around_document(
-        related_authors, related_keywords, related_source
+        related_authors, related_keywords, related_tags, related_source
     )
     db.session.commit()
     record_activity(
@@ -471,7 +524,7 @@ def delete(doc_id):
     )
 
     labels = {
-        "keywords": "关键词", "authors": "作者", "affiliations": "单位",
+        "keywords": "关键词", "tags": "标签", "authors": "作者", "affiliations": "单位",
         "sources": "来源", "publishers": "出版社",
     }
     parts = [f"{v} {labels[k]}" for k, v in cleaned.items() if k in labels and v]

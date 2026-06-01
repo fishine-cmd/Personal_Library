@@ -2,7 +2,7 @@ import re
 from typing import List, Optional, Union
 
 from ..extensions import db
-from ..models import Author, AuthorCode, Affiliation, Keyword, Publisher, Source
+from ..models import Author, AuthorCode, Affiliation, Keyword, Publisher, Source, Tag
 
 
 # ---------- Author ----------
@@ -103,6 +103,17 @@ def get_or_create_keyword(name: str, user_id: int) -> Keyword:
     db.session.add(kw)
     db.session.flush()
     return kw
+
+
+def get_or_create_tag(name: str, user_id: int) -> Tag:
+    name = name.strip()
+    tag = Tag.query.filter_by(user_id=user_id, name=name).first()
+    if tag:
+        return tag
+    tag = Tag(user_id=user_id, name=name)
+    db.session.add(tag)
+    db.session.flush()
+    return tag
 
 
 def get_or_create_publisher(name: str, user_id: int) -> Optional[Publisher]:

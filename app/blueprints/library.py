@@ -2,7 +2,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from flask_login import current_user, login_required
 
 from ..extensions import db
-from ..models import Affiliation, Author, Publisher, Source
+from ..models import Affiliation, Author, Keyword, Publisher, Source, Tag
 from ..services import dict_cleanup
 from ..services.ai_agent import record_activity
 
@@ -17,6 +17,8 @@ def index():
     affiliations = Affiliation.query.filter_by(user_id=uid).order_by(Affiliation.name).all()
     publishers = Publisher.query.filter_by(user_id=uid).order_by(Publisher.name).all()
     sources = Source.query.filter_by(user_id=uid).order_by(Source.name).all()
+    keywords = Keyword.query.filter_by(user_id=uid).order_by(Keyword.name).all()
+    tags = Tag.query.filter_by(user_id=uid).order_by(Tag.name).all()
     merge_audits = dict_cleanup.list_merge_audits(uid, limit=20)
     return render_template(
         "library/index.html",
@@ -24,6 +26,8 @@ def index():
         affiliations=affiliations,
         publishers=publishers,
         sources=sources,
+        keywords=keywords,
+        tags=tags,
         merge_audits=merge_audits,
     )
 
@@ -81,6 +85,32 @@ def delete_source(src_id):
         flash("来源已删除", "info")
     else:
         flash("来源不存在或关联了文献，无法删除", "warning")
+    return redirect(url_for("library.index"))
+
+
+@bp.route("/keywords/<int:kw_id>/delete", methods=["POST"])
+@login_required
+def delete_keyword(kw_id):
+    k = Keyword.query.filter_by(id=kw_id, user_id=current_user.id).first()
+    if k and not k.documents:
+        db.session.delete(k)
+        db.session.commit()
+        flash("关键词已删除", "info")
+    else:
+        flash("关键词不存在或关联了文献，无法删除", "warning")
+    return redirect(url_for("library.index"))
+
+
+@bp.route("/tags/<int:tag_id>/delete", methods=["POST"])
+@login_required
+def delete_tag(tag_id):
+    t = Tag.query.filter_by(id=tag_id, user_id=current_user.id).first()
+    if t and not t.documents:
+        db.session.delete(t)
+        db.session.commit()
+        flash("标签已删除", "info")
+    else:
+        flash("标签不存在或关联了文献，无法删除", "warning")
     return redirect(url_for("library.index"))
 
 
