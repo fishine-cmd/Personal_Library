@@ -515,6 +515,7 @@ async function loadMergePreview() {
       ${renderMergeType('出版社', plan.publishers)}
       ${renderMergeType('期刊 / 会议', plan.sources)}
       ${renderMergeType('关键词', plan.keywords)}
+      ${renderMergeType('标签', plan.tags)}
       ${summary.groups === 0 ? '<div class="text-muted">没有可合并的重复项。</div>' : ''}`;
 
     setMergeButtonsDisabled(summary.groups === 0);
@@ -572,6 +573,7 @@ cleanupApplyBtn.addEventListener('click', async () => {
       `出版社 ${deleted.publishers || 0}`,
       `来源 ${deleted.sources || 0}`,
       `关键词 ${deleted.keywords || 0}`,
+      `标签 ${deleted.tags || 0}`,
     ].join('\n'));
     location.reload();
   } catch (error) {

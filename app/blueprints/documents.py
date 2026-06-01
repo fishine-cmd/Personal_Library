@@ -1,5 +1,3 @@
-import os
-import uuid
 from pathlib import Path
 
 from flask import (
@@ -12,11 +10,9 @@ from flask import (
     current_app,
     send_from_directory,
     jsonify,
-    abort,
 )
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from werkzeug.utils import secure_filename
 
 from ..extensions import db
 from ..models import (
@@ -36,11 +32,6 @@ from ..services.ai_agent import record_activity
 from ..services.file_io import save_uploaded_files as _save_uploaded_files_impl
 
 bp = Blueprint("documents", __name__)
-
-
-def _allowed_file(filename: str) -> bool:
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    return ext in current_app.config["ALLOWED_EXTENSIONS"]
 
 
 def _expand_category_ids(root_id: int, user_id: int) -> list[int]:
@@ -181,6 +172,9 @@ def _persist_document_form(document: Document, form, files):
         flash(f"已自动去除 {len(raw_tags) - len(deduped)} 个重复标签", "info")
     for tag_name in deduped:
         document.tags.append(upsert.get_or_create_tag(tag_name, uid))
+
+    if files:
+        _save_uploaded_files(document, files)
 
 
 @bp.route("/")

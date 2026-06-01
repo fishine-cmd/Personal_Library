@@ -127,3 +127,80 @@ def test_tags_and_advanced_search(client):
     resp = client.get("/library/cleanup_scan")
     payload = resp.get_json()
     assert "高分子" in payload["orphans"]["tags"]
+
+
+def test_document_new_persists_uploaded_attachment(login_client, upload_pdf, seeded_user_id, app):
+    """POST /documents/new with an attachment should land a File row + on-disk file."""
+    from pathlib import Path
+
+    from flask import current_app
+
+    from app.models import Document, File
+
+    resp = login_client.post(
+        "/documents/new",
+        data={
+            "title": "Attached Paper",
+            "document_type": "journal_article",
+            "publication_year": "2024",
+            "source_name": "Nature",
+            "source_type": "journal",
+            "authors_raw": "Alice",
+            "reading_status": "unread",
+            "attachments": upload_pdf("attached.pdf"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    with app.app_context():
+        doc = Document.query.filter_by(user_id=seeded_user_id, title="Attached Paper").first()
+        assert doc is not None
+        files = File.query.filter_by(document_id=doc.id).all()
+        assert len(files) == 1
+        assert files[0].original_name == "attached.pdf"
+
+        upload_root = Path(current_app.config["UPLOAD_FOLDER"])
+        assert (upload_root / files[0].file_path).exists()
+
+
+def test_document_edit_persists_uploaded_attachment(login_client, upload_pdf, seeded_user_id, app):
+    """POST /documents/<id>/edit with a new attachment should also land it on disk."""
+    from pathlib import Path
+
+    from flask import current_app
+
+    from app.extensions import db
+    from app.models import Document, File
+
+    with app.app_context():
+        doc = Document(user_id=seeded_user_id, title="Editable")
+        db.session.add(doc)
+        db.session.commit()
+        doc_id = doc.id
+
+    resp = login_client.post(
+        f"/documents/{doc_id}/edit",
+        data={
+            "title": "Editable",
+            "document_type": "journal_article",
+            "publication_year": "2024",
+            "source_name": "Nature",
+            "source_type": "journal",
+            "authors_raw": "Alice",
+            "reading_status": "unread",
+            "attachments": upload_pdf("edited.pdf"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+
+    with app.app_context():
+        files = File.query.filter_by(document_id=doc_id).all()
+        assert len(files) == 1
+        assert files[0].original_name == "edited.pdf"
+
+        upload_root = Path(current_app.config["UPLOAD_FOLDER"])
+        assert (upload_root / files[0].file_path).exists()

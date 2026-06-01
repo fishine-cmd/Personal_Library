@@ -3,6 +3,7 @@ from datetime import datetime
 from app.extensions import db
 from app.models import AIAgentActivity, AIAgentJournal, AIAgentSetting, User
 from app.services.ai_agent import get_or_create_setting, record_activity
+from app.security import AI_AGENT_API_KEY_PREFIX
 
 
 def test_ai_agent_setting_and_activity_are_user_scoped(app):
@@ -96,6 +97,27 @@ def test_settings_save_ai_agent_config_without_key_echo(login_client, app):
         assert setting.agent_name == "Logger"
         assert setting.api_url == "https://ai.example.test/journal"
         assert setting.api_key == "sk-secret-value"
+        assert setting.api_key_ciphertext != "sk-secret-value"
+        assert setting.api_key_ciphertext.startswith(AI_AGENT_API_KEY_PREFIX)
+
+
+def test_legacy_plaintext_ai_api_key_is_migrated_on_access(app):
+    with app.app_context():
+        user = User(username="legacy_agent")
+        user.set_password("pw123456")
+        db.session.add(user)
+        db.session.commit()
+
+        setting = AIAgentSetting(user_id=user.id, agent_name="Legacy")
+        setting._api_key = "sk-legacy-plain"
+        db.session.add(setting)
+        db.session.commit()
+
+        loaded = get_or_create_setting(user.id)
+
+        assert loaded.api_key == "sk-legacy-plain"
+        assert loaded.api_key_ciphertext != "sk-legacy-plain"
+        assert loaded.api_key_ciphertext.startswith(AI_AGENT_API_KEY_PREFIX)
 
 
 def _patch_post(monkeypatch, response_body):

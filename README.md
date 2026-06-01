@@ -608,12 +608,11 @@ library_system/
 
 内部重要函数：
 
-1. `_allowed_file()`：检查上传文件类型是否合法。
-2. `_expand_category_ids()`：递归找出父分类下全部子分类。
-3. `_ordered_categories()`：整理分类树显示顺序。
-4. `_save_uploaded_files()`：把文件写入磁盘并生成 `File` 记录。
-5. `_persist_document_form()`：把表单内容真正转换成数据库记录。
-6. `_build_combined_markdown()`：合成 PDF 识别结果的 Markdown。
+1. `_expand_category_ids()`：递归找出父分类下全部子分类。
+2. `_ordered_categories()`：整理分类树显示顺序。
+3. `_save_uploaded_files()`：把文件写入磁盘并生成 `File` 记录（薄包装，落盘逻辑在 `app/services/file_io.py`）。
+4. `_persist_document_form()`：把表单内容（含附件）真正转换成数据库记录。
+5. `_build_combined_markdown()`：合成 PDF 识别结果的 Markdown。
 
 #### `app/blueprints/categories.py`
 

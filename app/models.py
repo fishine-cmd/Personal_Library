@@ -3,6 +3,11 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .extensions import db
+from .security import (
+    decrypt_ai_agent_api_key,
+    encrypt_ai_agent_api_key,
+    is_ai_agent_api_key_encrypted,
+)
 
 
 def _utcnow():
@@ -320,7 +325,7 @@ class AIAgentSetting(db.Model):
     position_x = db.Column(db.Integer, nullable=False, default=24)
     position_y = db.Column(db.Integer, nullable=False, default=24)
     api_url = db.Column(db.String(512))
-    api_key = db.Column(db.String(512))
+    _api_key = db.Column("api_key", db.Text)
     model = db.Column(db.String(64))
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
     updated_at = db.Column(
@@ -331,6 +336,28 @@ class AIAgentSetting(db.Model):
         "User",
         backref=db.backref("ai_agent_setting", uselist=False, cascade="all, delete-orphan"),
     )
+
+    @property
+    def api_key(self) -> str | None:
+        return decrypt_ai_agent_api_key(self._api_key)
+
+    @api_key.setter
+    def api_key(self, value: str | None) -> None:
+        self._api_key = encrypt_ai_agent_api_key(value)
+
+    @property
+    def api_key_ciphertext(self) -> str | None:
+        return self._api_key
+
+    def has_legacy_plaintext_api_key(self) -> bool:
+        return bool(self._api_key) and not is_ai_agent_api_key_encrypted(self._api_key)
+
+    def migrate_api_key_to_encrypted(self) -> bool:
+        if not self.has_legacy_plaintext_api_key():
+            return False
+        legacy_plain = self._api_key
+        self.api_key = legacy_plain
+        return True
 
 
 class AIAgentActivity(db.Model):
