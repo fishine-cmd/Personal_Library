@@ -191,7 +191,9 @@ http://127.0.0.1:5000
 
 ### 4.6 启动带 MinerU 的联调模式
 
-如果本机已经安装并可直接调用 `mineru-api`，可以双击或执行：
+如果你想使用 PDF 识别 / 批量识别功能，仅安装本项目的 Python 依赖还不够；还需要你另外安装 MinerU，并确保命令行里可以直接执行 `mineru-api`。
+
+如果本机已经安装好 MinerU，并且可直接调用 `mineru-api`，可以双击或执行：
 
 ```powershell
 .\launch.bat
@@ -202,7 +204,111 @@ http://127.0.0.1:5000
 1. `start.bat` -> `python run.py`
 2. `mineru.ps1` -> `mineru-api --host 127.0.0.1 --port 8000`
 
-如果你没有安装 MinerU，也可以先只启动主应用；只是 PDF 识别、批量识别相关功能会不可用。
+如果你还没有安装 MinerU，也可以先只启动主应用；只是 PDF 识别、批量识别相关功能会不可用。  
+首次部署 MinerU 的完整步骤见下一节。
+
+### 4.7 首次启用 MinerU 识别功能的完整步骤
+
+这一节面向**第一次**在本机使用 PDF 识别 / 批量识别的用户。完成一次之后，日常使用直接看 4.6 即可。
+
+#### 4.7.1 环境前提
+
+1. 操作系统：Windows（已验证）。Linux / macOS 也可以，但本项目附带的 `launch.bat` / `mineru.ps1` 仅适用于 Windows。
+2. Python 版本：**Windows 上必须是 `3.10` ~ `3.12`**，不要使用 3.13。MinerU 在 Windows 上依赖的 `ray` 暂不支持 3.13。
+3. 磁盘空间：至少预留 **20 GB**。MinerU 的模型权重体积较大。
+4. 内存：最低 16 GB，推荐 32 GB 以上。
+5. GPU（可选）：有 NVIDIA 显卡可以显著加速；没有也能用纯 CPU 跑 `pipeline` 后端，本项目默认就是 `pipeline`。
+
+#### 4.7.2 安装 MinerU
+
+推荐和本项目共用同一个虚拟环境，这样 `launch.bat` / `mineru.ps1` 能直接找到 `mineru-api` 命令，不必额外切换环境。
+
+```powershell
+# 先确保已激活本项目的虚拟环境
+.\.venv\Scripts\Activate.ps1
+
+# 升级 pip，并安装 uv（用 uv 安装 MinerU 速度更快）
+python -m pip install --upgrade pip
+pip install uv
+
+# 安装 MinerU 全功能版（包含 pipeline 后端所需依赖）
+uv pip install -U "mineru[all]"
+```
+
+如果国内网络较慢，可加镜像参数：
+
+```powershell
+uv pip install -U "mineru[all]" -i https://mirrors.aliyun.com/pypi/simple
+```
+
+安装完成后，**在已激活该虚拟环境的终端**里执行下面这条命令做一次自检：
+
+```powershell
+mineru-api --help
+```
+
+只要能输出帮助信息，就说明 `mineru-api` 已经在 PATH 中，可以被 `mineru.ps1` 直接调用。
+
+> 如果提示 `'mineru-api' 不是内部或外部命令`：说明你当前终端没有激活那个装了 MinerU 的虚拟环境，或者把 MinerU 装到了别的环境里。请重新激活后再试。
+
+#### 4.7.3 配置模型来源（国内推荐）
+
+本项目的 `mineru.ps1` 已经把模型源设成了 **ModelScope（魔搭）**，对国内网络更友好：
+
+```powershell
+$env:MINERU_MODEL_SOURCE = "modelscope"
+mineru-api --host 127.0.0.1 --port 8000
+```
+
+你不需要手动改这一行。如果你希望改用 HuggingFace，可以把 `modelscope` 替换成 `huggingface`，但需要保证能正常访问 huggingface.co。
+
+#### 4.7.4 首次启动 MinerU 服务并下载模型
+
+```powershell
+# 仍然在激活了虚拟环境的终端里
+.\mineru.ps1
+```
+
+第一次启动时，MinerU 会**自动下载所需的模型权重**到本地缓存目录。
+
+1. 这一步**需要可靠的网络**，国内用 ModelScope 一般几分钟到几十分钟不等。
+2. 全程不要关窗口，等到终端出现类似 `Uvicorn running on http://127.0.0.1:8000` 的日志，才算服务就绪。
+3. 模型下载只发生一次，之后启动会直接读取本地缓存，速度很快。
+
+模型下载到的位置由 ModelScope / HuggingFace 默认缓存目录决定，通常在用户目录下，不会写入本项目目录。
+
+#### 4.7.5 在本项目里启用 MinerU
+
+确认 `mineru-api` 服务已经跑起来之后：
+
+1. 启动主应用（新开一个终端）：`python run.py`，或直接双击 `launch.bat` 让两者一起拉起来。
+2. 浏览器打开 `http://127.0.0.1:5000`，注册 / 登录账号。
+3. 进入页面右上角的“**设置**”页。
+4. 在 `MinerU URL` 输入框里确认地址是 `http://127.0.0.1:8000`（这是系统默认值，未改过就不用动）。
+5. 点击右侧的“**测试连接**”按钮。看到提示成功，说明本系统已经可以正常调用 MinerU。
+6. 保存设置。
+
+#### 4.7.6 实际使用 PDF 识别
+
+完成上面 6 步之后，识别功能有两个入口：
+
+1. **单篇文献识别**  
+   在“文献” -> 某篇文献的“编辑”页里，使用 PDF 识别按钮，对该篇关联的 PDF 触发识别，识别结果会作为 Markdown 回填。
+2. **批量 PDF + BibTeX 入库**  
+   在“批量识别 / 批量导入”页，可以一次拖入多篇 PDF。系统会逐篇调用 MinerU，识别完成后让你补齐 / 修正每篇的 `.bib` 内容，再一并写入数据库，同时把 PDF 作为附件保存。
+
+#### 4.7.7 常见问题速查
+
+1. **设置页测试连接失败**  
+   先检查 `mineru.ps1` 那个窗口是不是还在运行、有没有报错；再确认 `MinerU URL` 是 `http://127.0.0.1:8000` 而不是别的端口。
+2. **`mineru-api` 命令找不到**  
+   通常是没在装了 MinerU 的虚拟环境里运行 `mineru.ps1`。可以在 `mineru.ps1` 里加一行 `& "C:\绝对路径\.venv\Scripts\Activate.ps1"`，或把 MinerU 装进系统 Python。
+3. **第一次识别非常慢 / 卡住**  
+   多半是首次下载模型，看看 `mineru-api` 窗口里是不是在打印下载进度。等到出现 `Uvicorn running on ...` 之后再触发识别会快得多。
+4. **Windows 上装 MinerU 报 `ray` 相关错误**  
+   你的 Python 很可能是 3.13。请改用 3.10 ~ 3.12 的解释器重建虚拟环境。
+5. **想完全不用 MinerU**  
+   直接跳过这一节即可；其他所有功能不依赖 MinerU。
 
 ---
 
@@ -388,7 +494,7 @@ pyinstaller library_system.spec --clean --noconfirm
 1. 打包产物不只是一个 `exe`，而是一整个目录。
 2. 分发时应把 `dist/PersonalLibrary/` 整体发给用户。
 3. MySQL 不会被打包进程序。
-4. MinerU 也不会自动成为主程序的一部分，仍需用户自行准备服务。
+4. MinerU 不会自动随本项目一起安装，也不会自动成为主程序的一部分；想使用 PDF 识别时，仍需用户按 MinerU 官方方式单独安装并启动 `mineru-api` 服务。
 
 ---
 
