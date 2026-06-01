@@ -19,12 +19,12 @@ def create_app(env: str = "dev") -> Flask:
     from . import models  # noqa: F401  让 linter 不提示“未使用导入”
 
     # 启动时自动创建所有数据库表(表已存在则不执行)
-    # 异常捕获：数据库连不上时也不会崩溃
+    # 数据库连不上时不阻断启动，但要在日志里留痕，便于排查
     with app.app_context():
         try:
             db.create_all()
         except Exception:
-            pass
+            app.logger.exception("db.create_all() failed during app startup")
 
     # 登录管理器的用户加载函数
     # Flask-Login 用它通过 user_id 获取用户对象

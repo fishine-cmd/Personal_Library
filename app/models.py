@@ -3,6 +3,11 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .extensions import db
+from .security import (
+    decrypt_ai_agent_api_key,
+    encrypt_ai_agent_api_key,
+    is_ai_agent_api_key_encrypted,
+)
 
 
 def _utcnow():
@@ -173,6 +178,24 @@ class Keyword(db.Model):
     )
 
 
+class Tag(db.Model):
+    __tablename__ = "tags"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    name = db.Column(db.String(128), nullable=False)
+
+    documents = db.relationship(
+        "Document", secondary="document_tags", back_populates="tags"
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_tag_user_name"),
+    )
+
+
 class Document(db.Model):
     __tablename__ = "documents"
 
@@ -225,6 +248,9 @@ class Document(db.Model):
     keywords = db.relationship(
         "Keyword", secondary="document_keywords", back_populates="documents"
     )
+    tags = db.relationship(
+        "Tag", secondary="document_tags", back_populates="documents"
+    )
     files = db.relationship(
         "File", back_populates="document", cascade="all, delete-orphan"
     )
@@ -240,6 +266,10 @@ class Document(db.Model):
     @property
     def keywords_display(self) -> str:
         return ", ".join(k.name for k in self.keywords)
+
+    @property
+    def tags_display(self) -> str:
+        return ", ".join(t.name for t in self.tags)
 
 
 class DocumentAuthor(db.Model):
@@ -258,6 +288,13 @@ class DocumentKeyword(db.Model):
 
     document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), primary_key=True)
     keyword_id = db.Column(db.Integer, db.ForeignKey("keywords.id"), primary_key=True)
+
+
+class DocumentTag(db.Model):
+    __tablename__ = "document_tags"
+
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), primary_key=True)
+    tag_id = db.Column(db.Integer, db.ForeignKey("tags.id"), primary_key=True)
 
 
 class UserSetting(db.Model):
@@ -284,12 +321,11 @@ class AIAgentSetting(db.Model):
     )
     agent_name = db.Column(db.String(64), nullable=False, default="小咪")
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    scale = db.Column(db.Float, nullable=False, default=1.0)
     facing = db.Column(db.String(8), nullable=False, default="right")
     position_x = db.Column(db.Integer, nullable=False, default=24)
     position_y = db.Column(db.Integer, nullable=False, default=24)
     api_url = db.Column(db.String(512))
-    api_key = db.Column(db.String(512))
+    _api_key = db.Column("api_key", db.Text)
     model = db.Column(db.String(64))
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
     updated_at = db.Column(
@@ -300,6 +336,28 @@ class AIAgentSetting(db.Model):
         "User",
         backref=db.backref("ai_agent_setting", uselist=False, cascade="all, delete-orphan"),
     )
+
+    @property
+    def api_key(self) -> str | None:
+        return decrypt_ai_agent_api_key(self._api_key)
+
+    @api_key.setter
+    def api_key(self, value: str | None) -> None:
+        self._api_key = encrypt_ai_agent_api_key(value)
+
+    @property
+    def api_key_ciphertext(self) -> str | None:
+        return self._api_key
+
+    def has_legacy_plaintext_api_key(self) -> bool:
+        return bool(self._api_key) and not is_ai_agent_api_key_encrypted(self._api_key)
+
+    def migrate_api_key_to_encrypted(self) -> bool:
+        if not self.has_legacy_plaintext_api_key():
+            return False
+        legacy_plain = self._api_key
+        self.api_key = legacy_plain
+        return True
 
 
 class AIAgentActivity(db.Model):

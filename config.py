@@ -8,6 +8,7 @@ load_dotenv(BASE_DIR / ".env")
 
 class BaseConfig:
     SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-only-change-me")
+    AI_AGENT_API_KEY_ENCRYPTION_KEY = os.getenv("AI_AGENT_API_KEY_ENCRYPTION_KEY")
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
         "mysql+pymysql://root:@localhost:3306/library_system?charset=utf8mb4",

@@ -134,6 +134,12 @@ erDiagram
         varchar  name
     }
 
+    TAGS {
+        int     id      PK
+        int     user_id FK "UK(user_id,name)"
+        varchar name
+    }
+
     DOCUMENTS {
         int      id               PK
         int      user_id          FK
@@ -163,6 +169,11 @@ erDiagram
     DOCUMENT_KEYWORDS {
         int      document_id    PK_FK
         int      keyword_id     PK_FK
+    }
+
+    DOCUMENT_TAGS {
+        int document_id PK_FK
+        int tag_id      PK_FK
     }
 
     USER_SETTINGS {

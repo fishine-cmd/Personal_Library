@@ -211,11 +211,12 @@
       </div>
     </div>
 
+    {% set has_advanced = title or abstract or author or source or keyword or tag or active_year_from or active_year_to %}
     <form class="row g-2 mb-2" method="get">
       {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
       <div class="col-md-6">
         <input type="search" name="q" value="{{ q }}" class="form-control"
-               placeholder="{% if active_category_name %}在「{{ active_category_name }}」内搜索 标题 / 摘要 / 作者 / 关键词 / DOI{% else %}搜索 标题 / 摘要 / 作者 / 关键词 / DOI{% endif %}">
+               placeholder="{% if active_category_name %}在「{{ active_category_name }}」内搜索 标题 / 摘要 / 作者 / 来源 / 关键词 / 标签 / DOI{% else %}搜索 标题 / 摘要 / 作者 / 来源 / 关键词 / 标签 / DOI{% endif %}">
       </div>
       <div class="col-md-3">
         <select name="type" class="form-select">
@@ -230,6 +231,58 @@
       </div>
       <div class="col-md-1 d-grid">
         <button class="btn btn-primary" type="submit">搜索</button>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+                data-bs-toggle="collapse" data-bs-target="#advanced-search"
+                aria-expanded="{{ 'true' if has_advanced else 'false' }}" aria-controls="advanced-search">
+          <i class="bi bi-sliders"></i> 高级检索
+        </button>
+        {% if has_advanced %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ url_for('documents.list_documents', category=active_category or none, q=q, type=active_type or none, year=active_year or none) }}">清除高级条件</a>
+        {% endif %}
+      </div>
+      <div class="col-12 collapse {% if has_advanced %}show{% endif %}" id="advanced-search">
+        <div class="border rounded p-3 bg-body-tertiary">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label small mb-1">标题部分匹配</label>
+              <input class="form-control form-control-sm" name="title" value="{{ title }}" placeholder="标题包含">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">摘要部分匹配</label>
+              <input class="form-control form-control-sm" name="abstract" value="{{ abstract }}" placeholder="摘要包含">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">作者</label>
+              <input class="form-control form-control-sm" name="author" value="{{ author }}" placeholder="作者姓名包含">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">刊物 / 来源</label>
+              <input class="form-control form-control-sm" name="source" value="{{ source }}" placeholder="来源名称包含">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">关键词</label>
+              <input class="form-control form-control-sm" name="keyword" value="{{ keyword }}" placeholder="关键词包含">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small mb-1">标签</label>
+              <input class="form-control form-control-sm" name="tag" value="{{ tag }}" placeholder="标签包含">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small mb-1">年份起始</label>
+              <input class="form-control form-control-sm" type="number" name="year_from" value="{{ active_year_from or '' }}" placeholder="例如 2020">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small mb-1">年份结束</label>
+              <input class="form-control form-control-sm" type="number" name="year_to" value="{{ active_year_to or '' }}" placeholder="例如 2024">
+            </div>
+            <div class="col-md-6 d-flex align-items-end justify-content-end gap-2">
+              <button class="btn btn-sm btn-primary" type="submit">应用条件</button>
+            </div>
+          </div>
+        </div>
       </div>
     </form>
     <div class="small text-muted mb-3 d-flex align-items-center gap-2">
@@ -267,6 +320,10 @@
                 <a class="doc-title-link" href="{{ url_for('documents.detail', doc_id=d.id) }}"><strong>{{ d.title }}</strong></a>
                 {% if d.rating %}<span class="text-warning">{% for _ in range(d.rating) %}★{% endfor %}</span>{% endif %}
                 {% if d.files %}<span class="badge bg-info text-dark ms-1">{{ d.files|length }} 附件</span>{% endif %}
+                {% for t in d.tags[:3] %}
+                  <a class="badge bg-primary text-decoration-none ms-1"
+                     href="{{ url_for('documents.list_documents', tag=t.name) }}">{{ t.name }}</a>
+                {% endfor %}
               </td>
               <td>{{ d.authors_display or '—' }}</td>
               <td>{{ d.source.name if d.source else '—' }}</td>
@@ -277,11 +334,70 @@
                 {% else %}<span class="badge bg-secondary">未读</span>{% endif %}
               </td>
               <td class="text-end text-nowrap">
+                <button class="btn btn-sm btn-outline-primary" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#doc-extra-{{ d.id }}"
+                        aria-expanded="false" aria-controls="doc-extra-{{ d.id }}">展开</button>
                 <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.edit', doc_id=d.id) }}">编辑</a>
                 <form class="d-inline" method="post" action="{{ url_for('documents.delete', doc_id=d.id) }}"
                       onsubmit="return confirm('确定删除此文献及其所有附件吗？');">
                   <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
                 </form>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="6" class="p-0 border-top-0">
+                <div class="collapse bg-body-tertiary p-3" id="doc-extra-{{ d.id }}">
+                  <div class="border rounded p-3">
+                  <div class="row g-3">
+                    <div class="col-lg-7">
+                      <div class="small text-muted mb-1">摘要</div>
+                      <div style="white-space:pre-wrap">{{ d.abstract or '无摘要' }}</div>
+                    </div>
+                    <div class="col-lg-5">
+                      <dl class="row small mb-2">
+                        <dt class="col-4">DOI</dt>
+                        <dd class="col-8 mb-1">
+                          {% if d.doi %}<a target="_blank" href="https://doi.org/{{ d.doi }}">{{ d.doi }}</a>{% else %}—{% endif %}
+                        </dd>
+                        <dt class="col-4">分类</dt>
+                        <dd class="col-8 mb-1">{{ d.category.name if d.category else '—' }}</dd>
+                        <dt class="col-4">卷 / 期 / 页</dt>
+                        <dd class="col-8 mb-1">{{ d.volume or '—' }} / {{ d.issue or '—' }} / {{ d.pages or '—' }}</dd>
+                      </dl>
+                      <div class="small text-muted mb-1">关键词</div>
+                      <div class="mb-2">
+                        {% for k in d.keywords %}
+                          <span class="badge bg-light text-dark border me-1">{{ k.name }}</span>
+                        {% else %}
+                          <span class="small text-muted">无</span>
+                        {% endfor %}
+                      </div>
+                      <div class="small text-muted mb-1">标签</div>
+                      <div class="mb-2">
+                        {% for t in d.tags %}
+                          <a class="badge bg-primary text-decoration-none me-1"
+                             href="{{ url_for('documents.list_documents', tag=t.name) }}">{{ t.name }}</a>
+                        {% else %}
+                          <span class="small text-muted">无</span>
+                        {% endfor %}
+                      </div>
+                      <div class="small text-muted mb-1">附件</div>
+                      <div>
+                        {% for f in d.files %}
+                          <a class="badge bg-light text-dark border text-decoration-none me-1"
+                             href="{{ url_for('documents.download_file', doc_id=d.id, file_id=f.id) }}" target="_blank">{{ f.original_name }}</a>
+                        {% else %}
+                          <span class="small text-muted">无附件</span>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.detail', doc_id=d.id) }}">查看完整文献</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('bibtex.export_one', doc_id=d.id) }}">导出 BibTeX</a>
+                  </div>
+                  </div>
+                </div>
               </td>
             </tr>
             {% endfor %}

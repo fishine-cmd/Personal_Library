@@ -1,6 +1,6 @@
 """Detect and remove unused dictionary entries.
 
-Dictionary tables (authors / affiliations / publishers / sources / keywords)
+Dictionary tables (authors / affiliations / publishers / sources / keywords / tags)
 are shared globally across users. Records not referenced by any document or
 author are dead weight and can be safely removed.
 
@@ -24,14 +24,16 @@ from ..models import (
     Document,
     DocumentAuthor,
     DocumentKeyword,
+    DocumentTag,
     Keyword,
     MergeAudit,
     Publisher,
     Source,
+    Tag,
 )
 
 _WS = re.compile(r"\s+")
-PLAN_KEYS = ("authors", "affiliations", "publishers", "sources", "keywords")
+PLAN_KEYS = ("authors", "affiliations", "publishers", "sources", "keywords", "tags")
 
 
 # ---- Orphan detection ----------------------------------------------------
@@ -56,6 +58,13 @@ def find_orphan_keywords(user_id: int) -> list[Keyword]:
     return Keyword.query.filter_by(user_id=user_id).filter(~Keyword.documents.any()).all()
 
 
+def find_orphan_tags(user_id: int) -> list[Tag]:
+    return (
+        Tag.query.filter_by(user_id=user_id)
+        .filter(~Tag.documents.any()).all()
+    )
+
+
 def scan_orphans(user_id: int) -> dict[str, list]:
     return {
         "authors": find_orphan_authors(user_id),
@@ -63,6 +72,7 @@ def scan_orphans(user_id: int) -> dict[str, list]:
         "publishers": find_orphan_publishers(user_id),
         "sources": find_orphan_sources(user_id),
         "keywords": find_orphan_keywords(user_id),
+        "tags": find_orphan_tags(user_id),
     }
 
 
@@ -82,7 +92,8 @@ def delete_all_orphans(user_id: int) -> dict[str, int]:
         ("publishers", find_orphan_publishers, True),
         ("authors", find_orphan_authors, True),
         ("affiliations", find_orphan_affiliations, True),
-        ("keywords", find_orphan_keywords, False),
+        ("keywords", find_orphan_keywords, True),
+        ("tags", find_orphan_tags, False),
     )
 
     for key, finder, should_flush in ordered_steps:
@@ -99,11 +110,13 @@ def delete_all_orphans(user_id: int) -> dict[str, int]:
 def prune_orphans_around_document(
     authors: Iterable[Author],
     keywords: Iterable[Keyword],
+    tags: Iterable[Tag],
     source: Optional[Source],
 ) -> dict[str, int]:
     """Delete now-unreferenced entities related to a just-deleted document."""
     counts = {
         "keywords": 0,
+        "tags": 0,
         "authors": 0,
         "affiliations": 0,
         "sources": 0,
@@ -115,6 +128,11 @@ def prune_orphans_around_document(
         if not kw.documents:
             db.session.delete(kw)
             counts["keywords"] += 1
+
+    for tag in tags:
+        if not tag.documents:
+            db.session.delete(tag)
+            counts["tags"] += 1
 
     affs_to_check: set[Affiliation] = set()
     user_names_to_check: set[tuple[int, str]] = set()
@@ -181,6 +199,7 @@ def find_potential_duplicates(user_id: int) -> dict[str, list[list]]:
         "publishers": _group_by_normalized_name(_load_user_rows(Publisher, user_id)),
         "sources": _group_by_normalized_name(_load_user_rows(Source, user_id)),
         "keywords": _group_by_normalized_name(_load_user_rows(Keyword, user_id)),
+        "tags": _group_by_normalized_name(_load_user_rows(Tag, user_id)),
     }
 
 
@@ -281,6 +300,14 @@ def _build_merge_plan(user_id: int) -> dict[str, list[dict]]:
             lambda aliases: _count_distinct(
                 db.session.query(DocumentKeyword.document_id).filter(
                     DocumentKeyword.keyword_id.in_([alias.id for alias in aliases])
+                )
+            ),
+        ),
+        "tags": _build_plan_from_groups(
+            groups["tags"],
+            lambda aliases: _count_distinct(
+                db.session.query(DocumentTag.document_id).filter(
+                    DocumentTag.tag_id.in_([alias.id for alias in aliases])
                 )
             ),
         ),
@@ -492,6 +519,42 @@ def _apply_keyword_group(canonical_id: int, alias_ids: list[int], audit: dict[st
     return changed
 
 
+def _apply_tag_group(canonical_id: int, alias_ids: list[int], audit: dict[str, list]) -> int:
+    changed = 0
+    for alias_id in alias_ids:
+        for link in DocumentTag.query.filter_by(tag_id=alias_id).all():
+            existing = DocumentTag.query.filter_by(
+                document_id=link.document_id,
+                tag_id=canonical_id,
+            ).first()
+            if existing:
+                audit["doc_tag_deleted"].append(
+                    {"document_id": link.document_id, "tag_id": alias_id}
+                )
+                db.session.delete(link)
+            else:
+                audit["doc_tag_updates"].append(
+                    {
+                        "document_id": link.document_id,
+                        "from_tag_id": alias_id,
+                        "to_tag_id": canonical_id,
+                    }
+                )
+                link.tag_id = canonical_id
+            changed += 1
+
+        alias_obj = db.session.get(Tag, alias_id)
+        if alias_obj is not None:
+            _append_deleted(
+                audit,
+                "tag",
+                alias_obj,
+                {"name": alias_obj.name},
+            )
+            db.session.delete(alias_obj)
+    return changed
+
+
 def _new_audit_payload(user_id: int, plan: dict[str, list[dict]]) -> dict[str, Any]:
     return {
         "user_id": user_id,
@@ -505,6 +568,8 @@ def _new_audit_payload(user_id: int, plan: dict[str, list[dict]]) -> dict[str, A
         "doc_source_updates": [],
         "doc_keyword_updates": [],
         "doc_keyword_deleted": [],
+        "doc_tag_updates": [],
+        "doc_tag_deleted": [],
     }
 
 
@@ -519,6 +584,7 @@ def merge_apply(user_id: int) -> dict:
         "publishers": _apply_publisher_group,
         "sources": _apply_source_group,
         "keywords": _apply_keyword_group,
+        "tags": _apply_tag_group,
     }
     for key in PLAN_KEYS:
         for item in plan[key]:
@@ -566,6 +632,8 @@ def _restore_deleted_row(user_id: int, deleted: dict[str, Any]) -> None:
         )
     elif model == "keyword":
         obj = Keyword(id=deleted["id"], user_id=user_id, name=payload["name"])
+    elif model == "tag":
+        obj = Tag(id=deleted["id"], user_id=user_id, name=payload["name"])
     else:
         return
     db.session.merge(obj)
@@ -578,6 +646,15 @@ def _ensure_document_keyword(document_id: int, keyword_id: int) -> None:
     ).first()
     if not exists:
         db.session.add(DocumentKeyword(document_id=document_id, keyword_id=keyword_id))
+
+
+def _ensure_document_tag(document_id: int, tag_id: int) -> None:
+    exists = DocumentTag.query.filter_by(
+        document_id=document_id,
+        tag_id=tag_id,
+    ).first()
+    if not exists:
+        db.session.add(DocumentTag(document_id=document_id, tag_id=tag_id))
 
 
 def _ensure_author_affiliation(author_id: int, affiliation_id: int) -> None:
@@ -631,6 +708,19 @@ def _rollback_keyword_changes(audit: dict[str, Any]) -> None:
         _ensure_document_keyword(change["document_id"], change["keyword_id"])
 
 
+def _rollback_tag_changes(audit: dict[str, Any]) -> None:
+    for change in audit.get("doc_tag_updates", []):
+        link = DocumentTag.query.filter_by(
+            document_id=change["document_id"],
+            tag_id=change["to_tag_id"],
+        ).first()
+        if link is not None:
+            link.tag_id = change["from_tag_id"]
+
+    for change in audit.get("doc_tag_deleted", []):
+        _ensure_document_tag(change["document_id"], change["tag_id"])
+
+
 def _rollback_author_affiliation_changes(audit: dict[str, Any]) -> None:
     for change in audit["author_aff_updates"]:
         if "from_affiliation_id" in change:
@@ -681,6 +771,7 @@ def _rollback_from_audit_row(user_id: int, row: MergeAudit) -> dict:
 
     _rollback_source_changes(audit)
     _rollback_keyword_changes(audit)
+    _rollback_tag_changes(audit)
     _rollback_author_affiliation_changes(audit)
     _rollback_document_author_changes(audit)
 

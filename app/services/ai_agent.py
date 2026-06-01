@@ -7,7 +7,6 @@ from ..extensions import db
 from ..models import AIAgentActivity, AIAgentJournal, AIAgentSetting
 
 DEFAULT_AGENT_NAME = "小咪"
-DEFAULT_AGENT_SCALE = 1.0
 DEFAULT_POSITION_X = 24
 DEFAULT_POSITION_Y = 24
 
@@ -42,12 +41,16 @@ def get_or_create_setting(user_id: int, commit: bool = True) -> AIAgentSetting:
             user_id=user_id,
             agent_name=DEFAULT_AGENT_NAME,
             enabled=True,
-            scale=DEFAULT_AGENT_SCALE,
             facing="right",
             position_x=DEFAULT_POSITION_X,
             position_y=DEFAULT_POSITION_Y,
         )
         db.session.add(setting)
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
+    elif setting.migrate_api_key_to_encrypted():
         if commit:
             db.session.commit()
         else:
@@ -59,7 +62,6 @@ def serialize_setting(setting: AIAgentSetting) -> dict:
     return {
         "agent_name": setting.agent_name or DEFAULT_AGENT_NAME,
         "enabled": bool(setting.enabled),
-        "scale": float(setting.scale or DEFAULT_AGENT_SCALE),
         "facing": setting.facing if setting.facing in {"left", "right"} else "right",
         "position_x": int(setting.position_x or DEFAULT_POSITION_X),
         "position_y": int(setting.position_y or DEFAULT_POSITION_Y),

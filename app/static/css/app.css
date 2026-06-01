@@ -88,12 +88,42 @@ body {
   background-color: var(--surface) !important;
   border-bottom: 1px solid var(--border);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+  --bs-navbar-toggler-border-color: var(--border);
+  --bs-navbar-toggler-focus-width: 0.18rem;
+  --bs-navbar-toggler-padding-y: 0.38rem;
+  --bs-navbar-toggler-padding-x: 0.5rem;
 }
 
 .navbar-brand {
   color: var(--fg) !important;
   font-weight: 650;
   letter-spacing: 0.3px;
+}
+
+.navbar .navbar-toggler {
+  background-color: var(--surface-2);
+  border-color: var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 12px rgba(16, 16, 16, 0.08);
+}
+
+.navbar .navbar-toggler:hover {
+  background-color: var(--accent);
+  border-color: var(--fg);
+}
+
+.navbar .navbar-toggler:focus-visible {
+  box-shadow:
+    0 0 0 0.18rem var(--focus-ring-soft),
+    0 0 0 0.32rem var(--focus-ring);
+}
+
+[data-theme="light"] .navbar.bg-dark {
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2816,16,16,0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.25' d='M4 7.5h22M4 15h22M4 22.5h22'/%3e%3c/svg%3e");
+}
+
+[data-theme="dark"] .navbar.bg-dark {
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28233,245,234,0.94%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.25' d='M4 7.5h22M4 15h22M4 22.5h22'/%3e%3c/svg%3e");
 }
 
 .navbar .nav-link,
@@ -475,6 +505,32 @@ a:hover {
   background-color: var(--hover-tint);
 }
 
+@media (max-width: 767.98px) {
+  .navbar-user-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.55rem;
+    margin-top: 0.35rem;
+  }
+
+  .navbar-user-actions .nav-item,
+  .navbar-user-actions .navbar-text {
+    margin: 0 !important;
+  }
+
+  .navbar-user-actions .nav-link,
+  .navbar-user-actions .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .navbar-user-actions--guest {
+    justify-content: flex-end;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cursor-glow {
     display: none !important;
@@ -623,7 +679,7 @@ a:hover {
 
 .ai-agent-menu {
   position: absolute;
-  left: 204px;
+  left: calc(100% + 4px);
   bottom: 0;
   width: 250px;
   padding: 0.75rem;

@@ -89,6 +89,18 @@
     </div>
 
     <div class="card mb-3">
+      <div class="card-header">标签</div>
+      <div class="card-body">
+        {% for t in doc.tags %}
+          <a class="badge bg-primary text-decoration-none me-1"
+             href="{{ url_for('documents.list_documents', tag=t.name) }}">{{ t.name }}</a>
+        {% else %}
+          <span class="text-muted">无</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
       <div class="card-header">附件</div>
       <ul class="list-group list-group-flush">
         {% for f in doc.files %}

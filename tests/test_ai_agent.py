@@ -3,6 +3,7 @@ from datetime import datetime
 from app.extensions import db
 from app.models import AIAgentActivity, AIAgentJournal, AIAgentSetting, User
 from app.services.ai_agent import get_or_create_setting, record_activity
+from app.security import AI_AGENT_API_KEY_PREFIX
 
 
 def test_ai_agent_setting_and_activity_are_user_scoped(app):
@@ -44,14 +45,15 @@ def test_ai_agent_state_update_is_user_scoped(client):
         "/ai-agent/api/state",
         json={
             "agent_name": "Alpha",
-            "scale": 1.35,
             "facing": "left",
             "position_x": 120,
             "position_y": 80,
         },
     )
     assert resp.status_code == 200
-    assert resp.get_json()["state"]["agent_name"] == "Alpha"
+    state = resp.get_json()["state"]
+    assert state["agent_name"] == "Alpha"
+    assert "scale" not in state
 
     client.get("/auth/logout")
     client.post(
@@ -61,6 +63,18 @@ def test_ai_agent_state_update_is_user_scoped(client):
     resp = client.get("/ai-agent/api/state")
     assert resp.status_code == 200
     assert resp.get_json()["state"]["agent_name"] != "Alpha"
+
+
+def test_ai_agent_state_ignores_legacy_scale_payload(login_client):
+    resp = login_client.post(
+        "/ai-agent/api/state",
+        json={"scale": 1.35, "position_x": 120, "position_y": 80},
+    )
+    assert resp.status_code == 200
+    state = resp.get_json()["state"]
+    assert state["position_x"] == 120
+    assert state["position_y"] == 80
+    assert "scale" not in state
 
 
 def test_settings_save_ai_agent_config_without_key_echo(login_client, app):
@@ -83,6 +97,27 @@ def test_settings_save_ai_agent_config_without_key_echo(login_client, app):
         assert setting.agent_name == "Logger"
         assert setting.api_url == "https://ai.example.test/journal"
         assert setting.api_key == "sk-secret-value"
+        assert setting.api_key_ciphertext != "sk-secret-value"
+        assert setting.api_key_ciphertext.startswith(AI_AGENT_API_KEY_PREFIX)
+
+
+def test_legacy_plaintext_ai_api_key_is_migrated_on_access(app):
+    with app.app_context():
+        user = User(username="legacy_agent")
+        user.set_password("pw123456")
+        db.session.add(user)
+        db.session.commit()
+
+        setting = AIAgentSetting(user_id=user.id, agent_name="Legacy")
+        setting._api_key = "sk-legacy-plain"
+        db.session.add(setting)
+        db.session.commit()
+
+        loaded = get_or_create_setting(user.id)
+
+        assert loaded.api_key == "sk-legacy-plain"
+        assert loaded.api_key_ciphertext != "sk-legacy-plain"
+        assert loaded.api_key_ciphertext.startswith(AI_AGENT_API_KEY_PREFIX)
 
 
 def _patch_post(monkeypatch, response_body):
